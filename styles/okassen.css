@@ -1,0 +1,84 @@
+/* Okassen: Better JSON Integration — стили окна импорта и кнопки в сайдбаре */
+
+/* Кнопка в шапке сайдбара предметов */
+.okassen-import-button {
+    flex: 0 0 auto;
+    margin: 4px;
+}
+
+/* Тело окна импорта */
+.okassen-import .okassen-import-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}
+
+.okassen-import .okassen-hint {
+    margin: 0;
+    opacity: 0.8;
+    font-size: var(--font-size-13, 13px);
+}
+
+.okassen-import .okassen-hint-small {
+    font-size: var(--font-size-11, 11px);
+    margin-top: -4px;
+}
+
+/* Поле JSON: крупное, моноширинное */
+.okassen-import .okassen-json {
+    min-height: 320px;
+    resize: vertical;
+    font-family: var(--font-mono, monospace);
+    font-size: var(--font-size-12, 12px);
+    white-space: pre;
+}
+
+.okassen-import .okassen-target-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.okassen-import .okassen-target-row label {
+    flex: 0 0 auto;
+    font-weight: bold;
+}
+
+.okassen-import .okassen-target-row input {
+    flex: 1;
+    font-family: var(--font-mono, monospace);
+}
+
+/* Сообщение об ошибке/успехе внутри окна */
+.okassen-import .okassen-message {
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.okassen-import .okassen-message.error {
+    border-color: var(--color-level-error, #b30000);
+    background: rgba(179, 0, 0, 0.1);
+    color: var(--color-level-error, #b30000);
+}
+
+.okassen-import .okassen-message.success {
+    border-color: var(--color-level-success, #1c7a1c);
+    background: rgba(28, 122, 28, 0.1);
+    color: var(--color-level-success, #1c7a1c);
+}
+
+/* Кнопки */
+.okassen-import .okassen-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.okassen-import .okassen-buttons button {
+    flex: 1;
+}

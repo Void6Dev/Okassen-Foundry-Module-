@@ -1,0 +1,28 @@
+<div class="okassen-import-body">
+    {{!-- Подсказка над полем ввода --}}
+    <p class="okassen-hint">{{localize "OKASSEN.import.hint"}}</p>
+
+    {{!-- Основное поле: сюда вставляется расширенный JSON --}}
+    <textarea class="okassen-json" spellcheck="false"
+              placeholder="{{localize 'OKASSEN.import.placeholder'}}"></textarea>
+
+    {{!-- Необязательная цель: UUID актёра (пусто = создать в мире) --}}
+    <div class="okassen-target-row">
+        <label>{{localize "OKASSEN.import.target"}}</label>
+        <input type="text" class="okassen-target" placeholder="Actor.a1b2c3d4e5f6...">
+    </div>
+    <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.import.targetHint"}}</p>
+
+    {{!-- Сообщение об ошибке/успехе — прямо в окне, не в консоли --}}
+    <div class="okassen-message" hidden></div>
+
+    {{!-- Кнопки. type="button" — намеренно: никакого submit-поведения формы --}}
+    <footer class="okassen-buttons">
+        <button type="button" data-action="create">
+            <i class="fa-solid fa-hammer"></i> {{localize "OKASSEN.import.create"}}
+        </button>
+        <button type="button" data-action="clear">
+            <i class="fa-solid fa-eraser"></i> {{localize "OKASSEN.import.clear"}}
+        </button>
+    </footer>
+</div>

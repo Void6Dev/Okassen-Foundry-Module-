@@ -1,0 +1,38 @@
+{
+    "OKASSEN.import.title": "Okassen — Item Import",
+    "OKASSEN.import.button": "Okassen Import",
+    "OKASSEN.import.hint": "Paste an extended item JSON (dnd5e + optional _forge block) and press \"Create\".",
+    "OKASSEN.import.placeholder": "{ \"name\": \"...\", \"type\": \"weapon\", \"system\": { ... }, \"_forge\": { ... } }",
+    "OKASSEN.import.target": "Target actor UUID",
+    "OKASSEN.import.targetHint": "Optional. Leave empty to create the item in the world (sidebar). A token UUID works too.",
+    "OKASSEN.import.create": "Create",
+    "OKASSEN.import.clear": "Clear",
+    "OKASSEN.import.parseError": "JSON parse error: {message}",
+    "OKASSEN.import.targetNotFound": "No actor found for UUID \"{uuid}\". Check the UUID (right-click the actor → \"Copy UUID\") or leave the field empty.",
+    "OKASSEN.import.success": "Item \"{name}\" created. You can paste the next JSON.",
+
+    "OKASSEN.notify.created": "Okassen: item \"{name}\" created ({place}).",
+    "OKASSEN.notify.world": "in the world",
+    "OKASSEN.notify.error": "Okassen: import error — {message}",
+    "OKASSEN.notify.wrongSystem": "Okassen: this module targets the dnd5e system — mechanics will not work in the current system.",
+    "OKASSEN.notify.nestedTooDeep": "Okassen: nested items deeper than 2 levels on \"{name}\" were ignored.",
+    "OKASSEN.notify.nestedFailed": "Okassen: failed to create nested item \"{name}\" — the rest of the import continued.",
+    "OKASSEN.notify.onUseUnregistered": "Okassen: onUse handler \"{handler}\" (item \"{item}\") is not registered. The item was created, but its on-use logic will not fire until the handler is added via api.registerHandler.",
+
+    "OKASSEN.errors.notAnObject": "The input must be a JSON item object (not an array or a string).",
+    "OKASSEN.errors.noName": "The item is missing the required \"name\" field.",
+    "OKASSEN.errors.noType": "Item \"{name}\" is missing the required \"type\" field.",
+    "OKASSEN.errors.badType": "Unknown item type \"{type}\" on \"{name}\". Valid types: {types}.",
+    "OKASSEN.errors.badForge": "The \"_forge\" block on \"{name}\" must be an object.",
+    "OKASSEN.errors.effectsNotArray": "\"_forge.effects\" on \"{name}\" must be an array.",
+    "OKASSEN.errors.nestedNotArray": "\"_forge.nested\" on \"{name}\" must be an array.",
+    "OKASSEN.errors.badOnUse": "\"_forge.onUse\" on \"{name}\" must be a handler-id string or null.",
+    "OKASSEN.errors.badChange": "Effect \"{effect}\" has a change without \"mechanic\" and without a \"key\" + \"mode\" pair — nothing to apply.",
+    "OKASSEN.errors.noValue": "Effect \"{effect}\" has a change with no \"value\".",
+    "OKASSEN.errors.unknownMechanic": "Unknown mechanic \"{mechanic}\". Available mechanics: {available}.",
+    "OKASSEN.errors.advantageNeedsMidi": "Mechanic \"{mechanic}\" is not supported: plain dnd5e 4.4.4 has no Active Effect flags for advantage/disadvantage (except advantage.init for initiative). Such effects require the midi-qol module (flags.midi-qol.advantage.*) — you can pass its key as a raw change via key + mode.",
+    "OKASSEN.errors.badSetValue": "Mechanic \"{mechanic}\": value \"{value}\" is not a valid key. Allowed values: {allowed}.",
+    "OKASSEN.errors.targetNotActor": "The import target is not an actor.",
+
+    "OKASSEN.onuse.logMessage": "<p><strong>Okassen:</strong> {actor} uses item \"{item}\". (demo onUse handler \"log\")</p>"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "okassen",
+  "title": "Okassen: Better JSON Integration (BJI)",
+  "description": "Импорт расширенного JSON в предметы dnd5e с Active Effects, вложениями и onUse-логикой. / Import of extended JSON into dnd5e items with Active Effects, nested items and onUse logic.",
+  "version": "0.1.0",
+  "compatibility": { "minimum": "13", "verified": "13" },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": { "minimum": "4.4.0", "verified": "4.4.4" }
+      }
+    ]
+  },
+  "esmodules": ["scripts/main.js"],
+  "styles": ["styles/okassen.css"],
+  "languages": [
+    { "lang": "ru", "name": "Русский", "path": "lang/ru.json" },
+    { "lang": "en", "name": "English", "path": "lang/en.json" }
+  ],
+  "authors": [{ "name": "Void2" }]
+}

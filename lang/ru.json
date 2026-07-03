@@ -1,0 +1,38 @@
+{
+    "OKASSEN.import.title": "Окассен — Импорт предмета",
+    "OKASSEN.import.button": "Импорт Окассен",
+    "OKASSEN.import.hint": "Вставьте расширенный JSON предмета (dnd5e + необязательный блок _forge) и нажмите «Создать».",
+    "OKASSEN.import.placeholder": "{ \"name\": \"...\", \"type\": \"weapon\", \"system\": { ... }, \"_forge\": { ... } }",
+    "OKASSEN.import.target": "UUID актёра-цели",
+    "OKASSEN.import.targetHint": "Необязательно. Пусто — предмет создаётся в мире (сайдбар). Подходит и UUID токена.",
+    "OKASSEN.import.create": "Создать",
+    "OKASSEN.import.clear": "Очистить",
+    "OKASSEN.import.parseError": "Ошибка разбора JSON: {message}",
+    "OKASSEN.import.targetNotFound": "Актёр по UUID «{uuid}» не найден. Проверьте UUID (ПКМ по актёру → «Копировать UUID») или оставьте поле пустым.",
+    "OKASSEN.import.success": "Предмет «{name}» создан. Можно вставить следующий JSON.",
+
+    "OKASSEN.notify.created": "Окассен: предмет «{name}» создан ({place}).",
+    "OKASSEN.notify.world": "в мире",
+    "OKASSEN.notify.error": "Окассен: ошибка импорта — {message}",
+    "OKASSEN.notify.wrongSystem": "Окассен: модуль рассчитан на систему dnd5e — в текущей системе механики работать не будут.",
+    "OKASSEN.notify.nestedTooDeep": "Окассен: вложенные предметы глубже 2 уровней у «{name}» проигнорированы.",
+    "OKASSEN.notify.nestedFailed": "Окассен: не удалось создать вложенный предмет «{name}» — остальной импорт продолжен.",
+    "OKASSEN.notify.onUseUnregistered": "Окассен: onUse-обработчик «{handler}» (предмет «{item}») не зарегистрирован. Предмет создан, но логика при использовании не сработает, пока обработчик не будет добавлен через api.registerHandler.",
+
+    "OKASSEN.errors.notAnObject": "Вход должен быть JSON-объектом предмета (не массивом и не строкой).",
+    "OKASSEN.errors.noName": "У предмета отсутствует обязательное поле «name».",
+    "OKASSEN.errors.noType": "У предмета «{name}» отсутствует обязательное поле «type».",
+    "OKASSEN.errors.badType": "Неизвестный тип предмета «{type}» у «{name}». Допустимые типы: {types}.",
+    "OKASSEN.errors.badForge": "Блок «_forge» у «{name}» должен быть объектом.",
+    "OKASSEN.errors.effectsNotArray": "«_forge.effects» у «{name}» должен быть массивом.",
+    "OKASSEN.errors.nestedNotArray": "«_forge.nested» у «{name}» должен быть массивом.",
+    "OKASSEN.errors.badOnUse": "«_forge.onUse» у «{name}» должен быть строкой-идентификатором обработчика или null.",
+    "OKASSEN.errors.badChange": "В эффекте «{effect}» есть change без «mechanic» и без пары «key» + «mode» — непонятно, что применять.",
+    "OKASSEN.errors.noValue": "В эффекте «{effect}» у change отсутствует «value».",
+    "OKASSEN.errors.unknownMechanic": "Неизвестная механика «{mechanic}». Доступные механики: {available}.",
+    "OKASSEN.errors.advantageNeedsMidi": "Механика «{mechanic}» не поддерживается: в чистой dnd5e 4.4.4 нет Active Effect-флагов преимущества/помехи (кроме advantage.init для инициативы). Для таких эффектов нужен модуль midi-qol (flags.midi-qol.advantage.*) — можно передать его ключ «сырым» change'ем через key + mode.",
+    "OKASSEN.errors.badSetValue": "Механика «{mechanic}»: значение «{value}» не является допустимым ключом. Допустимые значения: {allowed}.",
+    "OKASSEN.errors.targetNotActor": "Цель импорта не является актёром.",
+
+    "OKASSEN.onuse.logMessage": "<p><strong>Окассен:</strong> {actor} использует предмет «{item}». (демо-обработчик onUse «log»)</p>"
+}
