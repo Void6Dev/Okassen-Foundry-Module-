@@ -108,10 +108,12 @@ function documentHtml(raw, depth = 0) {
 }
 
 /**
- * Показать диалог предпросмотра для уже препроцессированного входа.
+ * Собрать HTML-сводку предпросмотра для уже препроцессированного входа.
+ * Используется и диалогом, и вкладкой «Предпросмотр» окна импорта.
  * @param {object|Array} parsed — документ или массив документов
+ * @returns {string} HTML блока .okassen-preview
  */
-export async function openPreviewDialog(parsed) {
+export function buildPreviewHtml(parsed) {
   const docs = Array.isArray(parsed) ? parsed : [parsed];
   const warnings = [...analyzeDependencies(parsed), ...analyzeSchema(parsed)];
 
@@ -119,16 +121,22 @@ export async function openPreviewDialog(parsed) {
     ? `<div class="okassen-preview-warnings">${warnings.map(w => `<p>⚠ ${esc(w)}</p>`).join("")}</div>`
     : "";
 
-  const content = `<div class="okassen-preview">
+  return `<div class="okassen-preview">
     <p class="okassen-preview-note">${game.i18n.format("OKASSEN.preview.note", { count: docs.length })}</p>
     ${warningsHtml}
     ${docs.map(d => documentHtml(d)).join("<hr>")}
   </div>`;
+}
 
+/**
+ * Показать диалог предпросмотра для уже препроцессированного входа.
+ * @param {object|Array} parsed — документ или массив документов
+ */
+export async function openPreviewDialog(parsed) {
   await foundry.applications.api.DialogV2.wait({
     window: { title: game.i18n.localize("OKASSEN.preview.title"), icon: "fa-solid fa-eye" },
     position: { width: 560 },
-    content,
+    content: buildPreviewHtml(parsed),
     buttons: [{ action: "close", label: "OKASSEN.history.close", icon: "fa-solid fa-xmark", default: true }],
     rejectClose: false
   });

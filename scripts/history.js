@@ -122,8 +122,13 @@ export async function rollbackImport(id) {
   return { deleted, restored };
 }
 
-/** Открыть диалог истории импорта (список + «Отменить» на каждой записи). */
-export async function openHistoryDialog() {
+/**
+ * Собрать HTML списка истории импорта (записи + кнопки «Отменить»).
+ * Используется и диалогом, и вкладкой «История» окна импорта. Кнопки
+ * помечены data-undo="<id>" — обработчик клика навешивает вызывающая сторона.
+ * @returns {string}
+ */
+export function buildHistoryHtml() {
   const history = game.settings.get(MODULE_ID, SETTING);
 
   const rows = history.map(rec => {
@@ -143,9 +148,14 @@ export async function openHistoryDialog() {
     </li>`;
   }).join("");
 
-  const content = history.length
+  return history.length
     ? `<ul class="okassen-history-list">${rows}</ul>`
     : `<p>${game.i18n.localize("OKASSEN.history.empty")}</p>`;
+}
+
+/** Открыть диалог истории импорта (список + «Отменить» на каждой записи). */
+export async function openHistoryDialog() {
+  const content = buildHistoryHtml();
 
   await foundry.applications.api.DialogV2.wait({
     window: { title: game.i18n.localize("OKASSEN.history.title"), icon: "fa-solid fa-clock-rotate-left" },

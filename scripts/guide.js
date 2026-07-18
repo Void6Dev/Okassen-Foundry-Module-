@@ -88,7 +88,7 @@ export const EXAMPLE_ITEM = {
 };
 
 /** HTML-содержимое журнала-руководства (на русском — проект автора русскоязычный). */
-const GUIDE_HTML = `
+export const GUIDE_HTML = `
 <h1>Окассен — импорт предметов из JSON</h1>
 <p>Модуль принимает обычный JSON предмета dnd5e с дополнительным блоком <code>_forge</code>
 и программно достраивает то, что обычный импорт теряет: <strong>Active Effects</strong>,
