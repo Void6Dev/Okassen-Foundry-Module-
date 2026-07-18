@@ -1,0 +1,52 @@
+name: Release
+
+# Собирает пакет и публикует GitHub Release при пуше тега вида v1.2.3.
+# Пользователю достаточно один раз указать manifest-ссылку:
+#   https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/module.json
+# — она всегда отдаёт module.json свежего релиза.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Версию и download-ссылку берём из тега, чтобы они всегда совпадали
+      # с публикуемым релизом (manifest указывает на latest).
+      - name: Patch module.json for this tag
+        run: |
+          node -e '
+            const fs = require("fs");
+            const tag = process.env.GITHUB_REF_NAME;          // напр. v0.3.0
+            const repo = process.env.GITHUB_REPOSITORY;        // owner/repo
+            const m = JSON.parse(fs.readFileSync("module.json", "utf8"));
+            m.version = tag.replace(/^v/, "");
+            m.manifest = `https://github.com/${repo}/releases/latest/download/module.json`;
+            m.download = `https://github.com/${repo}/releases/download/${tag}/module.zip`;
+            fs.writeFileSync("module.json", JSON.stringify(m, null, 2) + "\n");
+            console.log("Patched module.json:", { version: m.version, download: m.download });
+          '
+
+      # zip со структурой «файлы в корне» (без вложенной папки репозитория).
+      - name: Build module.zip
+        run: |
+          zip -r module.zip . \
+            -x ".git/*" ".github/*" "module.zip" "_preview_harness.html"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            module.json
+            module.zip
