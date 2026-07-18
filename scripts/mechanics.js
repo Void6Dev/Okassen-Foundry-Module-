@@ -18,7 +18,15 @@
  * ВАЖНО: одна механика может разворачиваться в НЕСКОЛЬКО changes (например,
  * «бонус к урону заклинаний» — в dnd5e нет единого ключа, есть msak и rsak отдельно).
  * Поэтому значением карты может быть как объект, так и массив объектов.
+ *
+ * Ключи проверялись против dnd5e 4.4.4 и перепроверены на dnd5e 5.3.3
+ * (совпадают: system.bonuses.*, system.abilities.*, system.attributes.*,
+ * system.traits.*, system.skills.*, system.tools.*). Метки «verified against
+ * dnd5e 4.4.4» ниже относятся к этим же путям.
  */
+
+import { validateOverTime } from "./overtime.js";
+import { midiActive } from "./deps.js";
 
 // Режимы Active Effect. CONST доступен глобально к моменту загрузки esmodules.
 // CUSTOM 0, MULTIPLY 1, ADD 2, DOWNGRADE 3, UPGRADE 4, OVERRIDE 5
@@ -33,8 +41,10 @@ export const MECHANICS = {
   // ------------------------------------------------------------------
   // Урон и атака (глобальные бонусы актёра по типу действия)
   // ------------------------------------------------------------------
-  "damage.melee.bonus":  { key: "system.bonuses.mwak.damage", mode: MODES.ADD }, // verified against dnd5e 4.4.4
-  "damage.ranged.bonus": { key: "system.bonuses.rwak.damage", mode: MODES.ADD }, // verified against dnd5e 4.4.4
+  // damageTyped: у записи change можно указать поле type ("fire") —
+  // значение станет "1d4[fire]", и dnd5e прочитает тип урона из формулы.
+  "damage.melee.bonus":  { key: "system.bonuses.mwak.damage", mode: MODES.ADD, damageTyped: true }, // verified against dnd5e 4.4.4
+  "damage.ranged.bonus": { key: "system.bonuses.rwak.damage", mode: MODES.ADD, damageTyped: true }, // verified against dnd5e 4.4.4
   "attack.melee.bonus":  { key: "system.bonuses.mwak.attack", mode: MODES.ADD }, // verified against dnd5e 4.4.4
   "attack.ranged.bonus": { key: "system.bonuses.rwak.attack", mode: MODES.ADD }, // verified against dnd5e 4.4.4
 
@@ -42,8 +52,8 @@ export const MECHANICS = {
   // Заклинания делятся на msak (ближние) и rsak (дальние), поэтому одна механика
   // разворачивается в два change. // verified against dnd5e 4.4.4
   "damage.spell.bonus": [
-    { key: "system.bonuses.msak.damage", mode: MODES.ADD },
-    { key: "system.bonuses.rsak.damage", mode: MODES.ADD }
+    { key: "system.bonuses.msak.damage", mode: MODES.ADD, damageTyped: true },
+    { key: "system.bonuses.rsak.damage", mode: MODES.ADD, damageTyped: true }
   ],
   "attack.spell.bonus": [
     { key: "system.bonuses.msak.attack", mode: MODES.ADD },
@@ -63,6 +73,12 @@ export const MECHANICS = {
   // Здоровье (бонусы HP есть только у персонажей; у NPC поле отсутствует)
   // ------------------------------------------------------------------
   "hp.max.bonus": { key: "system.attributes.hp.bonuses.overall", mode: MODES.ADD }, // verified against dnd5e 4.4.4
+
+  // Временные хиты: UPGRADE — «пока эффект активен, temp HP не ниже N».
+  // Тот же паттерн, что у эффекта Героизма в самой dnd5e: потраченные
+  // temp HP вернутся при пересчёте, снятие эффекта их убирает.
+  // Для РАЗОВОЙ выдачи temp HP используйте onUse-обработчик, не эффект.
+  "hp.temp": { key: "system.attributes.hp.temp", mode: MODES.UPGRADE }, // verified against dnd5e 4.4.4
 
   // ------------------------------------------------------------------
   // Скорость
@@ -95,7 +111,61 @@ export const MECHANICS = {
   // ------------------------------------------------------------------
   "resistance.add":    { key: "system.traits.dr.value", mode: MODES.ADD, set: "damageTypes" }, // verified against dnd5e 4.4.4
   "immunity.add":      { key: "system.traits.di.value", mode: MODES.ADD, set: "damageTypes" }, // verified against dnd5e 4.4.4
-  "vulnerability.add": { key: "system.traits.dv.value", mode: MODES.ADD, set: "damageTypes" }  // verified against dnd5e 4.4.4
+  "vulnerability.add": { key: "system.traits.dv.value", mode: MODES.ADD, set: "damageTypes" }, // verified against dnd5e 4.4.4
+
+  // Иммунитет к состоянию (ошеломление, испуг и т.д.) — тоже множество.
+  // Значение — ключ из CONFIG.DND5E.conditionTypes (например "frightened").
+  "conditionImmunity.add": { key: "system.traits.ci.value", mode: MODES.ADD, set: "conditionTypes" }, // verified against dnd5e 4.4.4
+
+  // Язык — множество system.traits.languages.value. Без строгой проверки
+  // значения: в 4.4.4 конфиг языков вложенный (standard/exotic с children),
+  // плюс миры часто добавляют свои языки.
+  "language.add": { key: "system.traits.languages.value", mode: MODES.ADD }, // verified against dnd5e 4.4.4
+
+  // ------------------------------------------------------------------
+  // Владения. Оружие/доспехи — множества traits (значения: категории
+  // "sim"/"mar"/"lgt"... или конкретные baseItem-идентификаторы; конфиг
+  // вложенный, поэтому строгой проверки нет — как у языков).
+  // Инструменты в dnd5e 4.x живут НЕ в traits, а в system.tools.<id>.value —
+  // ключ динамический: значение записи подставляется в «*»
+  // (value: "thief" → system.tools.thief.value = 1).
+  // ------------------------------------------------------------------
+  "proficiency.weapon.add": { key: "system.traits.weaponProf.value", mode: MODES.ADD }, // verified against dnd5e 4.4.4
+  "proficiency.armor.add":  { key: "system.traits.armorProf.value",  mode: MODES.ADD }, // verified against dnd5e 4.4.4
+  "proficiency.tool.add": { key: "system.tools.*.value", mode: MODES.UPGRADE, dynamicKey: true, fixedValue: 1, set: "tools" }, // verified against dnd5e 4.4.4
+
+  // ------------------------------------------------------------------
+  // Чувства (в футах). UPGRADE — повышение до значения: тёмное зрение 60
+  // не ухудшит расовое 120.
+  // ------------------------------------------------------------------
+  "senses.darkvision":  { key: "system.attributes.senses.darkvision",  mode: MODES.UPGRADE }, // verified against dnd5e 4.4.4
+  "senses.blindsight":  { key: "system.attributes.senses.blindsight",  mode: MODES.UPGRADE }, // verified against dnd5e 4.4.4
+  "senses.tremorsense": { key: "system.attributes.senses.tremorsense", mode: MODES.UPGRADE }, // verified against dnd5e 4.4.4
+  "senses.truesight":   { key: "system.attributes.senses.truesight",   mode: MODES.UPGRADE }, // verified against dnd5e 4.4.4
+
+  // ------------------------------------------------------------------
+  // Заклинания и концентрация
+  // ------------------------------------------------------------------
+  "spell.dc.bonus": { key: "system.bonuses.spell.dc", mode: MODES.ADD }, // verified against dnd5e 4.4.4
+  "save.concentration.bonus": { key: "system.attributes.concentration.bonuses.save", mode: MODES.ADD }, // verified against dnd5e 4.4.4
+
+  // ------------------------------------------------------------------
+  // Урон/лечение «во времени» — по ходам боя. Это НЕ обычные AE-changes:
+  // effects.js разворачивает их либо в flags.midi-qol.OverTime (midi активен),
+  // либо в flags.okassen.overTime эффекта (встроенный обработчик хода).
+  // Дополнительные поля записи: type (тип урона, обязателен для damage),
+  // turn ("start"|"end", по умолчанию "start"), save + dc (только с midi).
+  // ------------------------------------------------------------------
+  "damage.overTime": { special: "overTime", kind: "damage" },
+  "heal.overTime":   { special: "overTime", kind: "heal" },
+
+  // ------------------------------------------------------------------
+  // Порог критического попадания (например 19 = крит на 19-20).
+  // DOWNGRADE — берётся МЕНЬШЕЕ значение (меньший порог лучше).
+  // Эти флаги dnd5e читает сама — midi-qol не нужен.
+  // ------------------------------------------------------------------
+  "crit.weapon.threshold": { key: "flags.dnd5e.weaponCriticalThreshold", mode: MODES.DOWNGRADE }, // verified against dnd5e 4.4.4
+  "crit.spell.threshold":  { key: "flags.dnd5e.spellCriticalThreshold",  mode: MODES.DOWNGRADE }  // verified against dnd5e 4.4.4
 };
 
 // ------------------------------------------------------------------
@@ -121,40 +191,82 @@ for (const skl of SKILLS) {
 }
 
 /**
+ * Курированные механики, работающие ТОЛЬКО через midi-qol: их нет в чистой
+ * dnd5e ни в каком виде. Значение записи — 1 (флаг-переключатель), кроме
+ * dr.* — там число/формула снижаемого урона. Ключи — стабильные флаги midi-qol.
+ *
+ *  - grants.* — как атакующие бьют ПО носителю эффекта (помеха/преимущество им);
+ *  - fail.*   — носитель автоматически проваливает все спасброски/проверки;
+ *  - dr.all / dr.nonmagical — плоское снижение получаемого урона (midi DR).
+ */
+export const MIDI_MECHANICS = {
+  "grants.advantage.attack.all":    "flags.midi-qol.grants.advantage.attack.all",
+  "grants.disadvantage.attack.all": "flags.midi-qol.grants.disadvantage.attack.all",
+  "fail.save.all":                  "flags.midi-qol.fail.ability.save.all",
+  "fail.check.all":                 "flags.midi-qol.fail.ability.check.all",
+  "dr.all":                         "flags.midi-qol.DR.all",
+  "dr.nonmagical":                  "flags.midi-qol.DR.non-magical"
+};
+
+/** Механика требует активного midi-qol (advantage/disadvantage или из MIDI_MECHANICS)? */
+export function mechanicNeedsMidi(mechanic) {
+  if (typeof mechanic !== "string") return false;
+  if (mechanic in MIDI_MECHANICS) return true;
+  return /^(advantage|disadvantage)\./.test(mechanic) && mechanic !== "advantage.init";
+}
+
+/**
  * Разрешить механику в массив шаблонов change.
  *
  * @param {string} mechanic — короткая запись механики
  * @returns {Array<{key: string, mode: number, priority?: number, set?: string}>}
  * @throws {Error} — с человекочитаемым текстом, если механика неизвестна.
- *   Для advantage.*/disadvantage.* (кроме advantage.init) — отдельное пояснение
- *   про midi-qol: в чистой dnd5e 4.4.4 таких AE-флагов просто нет, и мы честно
- *   отказываемся, а не делаем вид, что работает.
+ *   Для механик advantage.* / disadvantage.* (кроме advantage.init) и для
+ *   курированных midi-механик (grants.* / fail.* / dr.*) — отдельное пояснение
+ *   про midi-qol: без него таких AE-флагов просто нет, и мы честно отказываемся,
+ *   а не делаем вид, что работает.
  */
 export function resolveMechanic(mechanic) {
   const def = MECHANICS[mechanic];
   if (def) return Array.isArray(def) ? def : [def];
 
-  // Особый случай: преимущество/помеха. База dnd5e 4.4.4 не умеет это через
-  // Active Effects (кроме инициативы) — нужен модуль midi-qol.
+  // Курированные midi-механики: с активным midi → его флаг, иначе честный отказ.
+  if (mechanic in MIDI_MECHANICS) {
+    if (midiActive()) return [{ key: MIDI_MECHANICS[mechanic], mode: MODES.OVERRIDE }];
+    throw new Error(game.i18n.format("OKASSEN.errors.mechanicNeedsMidi", { mechanic }));
+  }
+
+  // Особый случай: преимущество/помеха. База dnd5e не умеет это через Active
+  // Effects (кроме инициативы). Если midi-qol АКТИВЕН — дружелюбная обёртка:
+  // advantage.attack.mwak → flags.midi-qol.advantage.attack.mwak
+  // (value в записи ставьте 1). Без midi — честный отказ, как раньше.
   if (/^(advantage|disadvantage)\./.test(mechanic)) {
+    if (midiActive()) {
+      return [{ key: `flags.midi-qol.${mechanic}`, mode: MODES.OVERRIDE }];
+    }
     throw new Error(game.i18n.format("OKASSEN.errors.advantageNeedsMidi", { mechanic }));
   }
 
-  const available = Object.keys(MECHANICS).sort().join(", ");
+  const available = [...Object.keys(MECHANICS), ...Object.keys(MIDI_MECHANICS)].sort().join(", ");
   throw new Error(game.i18n.format("OKASSEN.errors.unknownMechanic", { mechanic, available }));
 }
 
 /**
- * Проверить значение change для механики. Сейчас проверяет только механики-множества:
- * значение должно быть валидным ключом CONFIG.DND5E[set] (например, типом урона).
+ * Проверить запись change для механики: значения-множества (валидный ключ
+ * CONFIG.DND5E[set]) и спецификации overTime (формула/тип/ход/спасбросок).
  *
  * @param {string} mechanic — имя механики (для текста ошибки)
  * @param {Array} defs — результат resolveMechanic
- * @param {*} value — значение из JSON
- * @throws {Error} — если значение не подходит
+ * @param {object} change — ПОЛНАЯ запись change из JSON (не только value)
+ * @throws {Error} — если запись не подходит
  */
-export function validateChangeValue(mechanic, defs, value) {
+export function validateChangeValue(mechanic, defs, change) {
+  const value = change.value;
   for (const def of defs) {
+    if (def.special === "overTime") {
+      validateOverTime(mechanic, def.kind, change);
+      continue;
+    }
     if (!def.set) continue;
     const config = CONFIG.DND5E?.[def.set] ?? {};
     if (!(value in config)) {

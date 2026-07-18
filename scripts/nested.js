@@ -18,7 +18,10 @@
  * Ошибка в одном вложении НЕ роняет весь импорт — каждый ребёнок обёрнут в try/catch.
  */
 
-import { buildEffects } from "./effects.js";
+import { buildEffects, linkActivityEffects } from "./effects.js";
+import { stampFormatVersion } from "./migrations.js";
+import { applyForgeHookFlags } from "./lifecycle.js";
+import { recordCreated } from "./history.js";
 
 const MODULE_ID = "okassen";
 const MAX_DEPTH = 2;
@@ -52,19 +55,28 @@ export async function attachNested(parentItem, nestedDefs = [], depth = 1) {
 
       data.flags = foundry.utils.mergeObject(data.flags ?? {}, forge.extraFlags ?? {});
       foundry.utils.setProperty(data.flags, `${MODULE_ID}.parent`, parentItem.uuid);
+      stampFormatVersion(data.flags);
       if (forge.onUse) foundry.utils.setProperty(data.flags, `${MODULE_ID}.onUse`, forge.onUse);
+      applyForgeHookFlags(data.flags, forge);
       data.effects = buildEffects(forge.effects ?? []);
+      linkActivityEffects(data, forge.effects ?? []);
 
       // Где создавать: рядом с родителем.
       let child;
       if (parentItem.isEmbedded) {
         // Родитель на актёре — ребёнок сразу на том же актёре.
         [child] = await parentItem.actor.createEmbeddedDocuments("Item", [data]);
+      } else if (parentItem.pack) {
+        // Родитель в компендиуме — ребёнок в том же паке (uuid-связка
+        // остаётся валидной: Compendium-uuid'ы разрешаются fromUuid).
+        child = await Item.implementation.create(data, { pack: parentItem.pack });
       } else {
-        // Родитель мировой — ребёнок тоже мировой.
+        // Родитель мировой — ребёнок тоже мировой, в той же папке.
+        if (parentItem.folder) data.folder = parentItem.folder.id;
         child = await Item.implementation.create(data);
       }
       created.push(child);
+      recordCreated(child);
 
       // Рекурсия: вложенные вложенных (второй уровень).
       if (Array.isArray(forge.nested) && forge.nested.length) {
