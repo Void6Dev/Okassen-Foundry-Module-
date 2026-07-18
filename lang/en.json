@@ -212,5 +212,35 @@
     "OKASSEN.mechPattern.ability": "Ability score increase: {label}",
     "OKASSEN.mechPattern.save": "Saving throw bonus: {label}",
     "OKASSEN.mechPattern.check": "Ability check bonus: {label}",
-    "OKASSEN.mechPattern.skill": "Skill bonus: {label}"
+    "OKASSEN.mechPattern.skill": "Skill bonus: {label}",
+
+    "OKASSEN.tabs.import": "Import",
+    "OKASSEN.tabs.export": "Export",
+    "OKASSEN.tabs.preview": "Preview",
+    "OKASSEN.tabs.history": "History",
+    "OKASSEN.tabs.handlers": "Handlers",
+    "OKASSEN.tabs.guide": "Guide",
+    "OKASSEN.tabs.settings": "Settings",
+
+    "OKASSEN.dest.title": "Destination",
+
+    "OKASSEN.export.tabHint": "Paste a document UUID (or a compendium id) and press \"Export\". The extended JSON appears in the editor on the \"Import\" tab — copy it from there or re-import it right away.",
+    "OKASSEN.export.uuidLabel": "Item / actor / folder UUID or compendium id",
+    "OKASSEN.export.tabTargets": "An item or actor exports as a single JSON; a folder (Folder.xxx) with subfolders or a compendium id (world.my-items) exports as a JSON array. Right-click the document → \"Copy UUID\".",
+
+    "OKASSEN.preview.run": "Run preview",
+    "OKASSEN.preview.tabEmpty": "Paste JSON on the \"Import\" tab and press \"Run preview\" — a dry run appears here, creating nothing.",
+
+    "OKASSEN.history.refresh": "Refresh",
+
+    "OKASSEN.guide.openJournal": "Open as journal",
+
+    "OKASSEN.settings.version": "Module version",
+    "OKASSEN.settings.formatVersion": "_forge format version",
+    "OKASSEN.settings.system": "System",
+    "OKASSEN.settings.core": "Foundry core",
+    "OKASSEN.settings.historyCount": "Import history entries",
+    "OKASSEN.settings.active": "active",
+    "OKASSEN.settings.inactive": "inactive",
+    "OKASSEN.settings.note": "Dependencies are optional: without midi-qol/DAE effects and nested items still work, but some mechanics (advantage/disadvantage, overTime saves) will not — the import warns about this."
 }

@@ -212,5 +212,35 @@
     "OKASSEN.mechPattern.ability": "Прибавка к значению характеристики: {label}",
     "OKASSEN.mechPattern.save": "Бонус спасброска: {label}",
     "OKASSEN.mechPattern.check": "Бонус проверки характеристики: {label}",
-    "OKASSEN.mechPattern.skill": "Бонус навыка: {label}"
+    "OKASSEN.mechPattern.skill": "Бонус навыка: {label}",
+
+    "OKASSEN.tabs.import": "Импорт",
+    "OKASSEN.tabs.export": "Экспорт",
+    "OKASSEN.tabs.preview": "Предпросмотр",
+    "OKASSEN.tabs.history": "История",
+    "OKASSEN.tabs.handlers": "Обработчики",
+    "OKASSEN.tabs.guide": "Руководство",
+    "OKASSEN.tabs.settings": "Настройки",
+
+    "OKASSEN.dest.title": "Назначение",
+
+    "OKASSEN.export.tabHint": "Вставьте UUID документа (или id компендиума) и нажмите «Экспорт». Расширенный JSON появится в редакторе на вкладке «Импорт» — оттуда его можно скопировать или тут же переимпортировать.",
+    "OKASSEN.export.uuidLabel": "UUID предмета / актёра / папки / id компендиума",
+    "OKASSEN.export.tabTargets": "Предмет или актёр — один JSON; папка (Folder.xxx) с подпапками или id компендиума (world.my-items) — JSON-массив. ПКМ по документу → «Копировать UUID».",
+
+    "OKASSEN.preview.run": "Прогнать предпросмотр",
+    "OKASSEN.preview.tabEmpty": "Вставьте JSON на вкладке «Импорт» и нажмите «Прогнать предпросмотр» — здесь появится сухой прогон без создания документов.",
+
+    "OKASSEN.history.refresh": "Обновить",
+
+    "OKASSEN.guide.openJournal": "Открыть как журнал",
+
+    "OKASSEN.settings.version": "Версия модуля",
+    "OKASSEN.settings.formatVersion": "Версия формата _forge",
+    "OKASSEN.settings.system": "Система",
+    "OKASSEN.settings.core": "Ядро Foundry",
+    "OKASSEN.settings.historyCount": "Записей в истории импорта",
+    "OKASSEN.settings.active": "активен",
+    "OKASSEN.settings.inactive": "не активен",
+    "OKASSEN.settings.note": "Зависимости необязательны: без midi-qol/DAE эффекты и вложения работают, но часть механик (преимущество/помеха, спасброски overTime) не сработает — импорт об этом предупреждает."
 }

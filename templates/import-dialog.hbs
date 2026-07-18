@@ -1,109 +1,203 @@
-<div class="okassen-import-body">
-    {{!-- Подсказка над полем ввода --}}
-    <p class="okassen-hint">{{localize "OKASSEN.import.hint"}}</p>
+<div class="okassen-import-body okassen-tabbed">
 
-    {{!-- Редактор JSON: номера строк + подсветка. Под прозрачным textarea
-          лежит pre с раскрашенной копией текста (см. editor.js) --}}
-    <div class="okassen-editor">
-        <div class="okassen-gutter" aria-hidden="true"></div>
-        <div class="okassen-editor-main">
-            <pre class="okassen-highlight" aria-hidden="true"><code></code></pre>
-            <textarea class="okassen-json" spellcheck="false" wrap="off"
-                      placeholder="{{localize 'OKASSEN.import.placeholder'}}"></textarea>
+    {{!-- ============================================================ --}}
+    {{!-- Навигация по вкладкам. Переключение — action "tab" (main.js),  --}}
+    {{!-- все секции присутствуют в DOM, скрытые погашены классом.       --}}
+    {{!-- ============================================================ --}}
+    <nav class="okassen-tabs" aria-label="Okassen">
+        <button type="button" class="okassen-tab-btn active" data-action="tab" data-tab="import">
+            <i class="fa-solid fa-file-import"></i> {{localize "OKASSEN.tabs.import"}}
+        </button>
+        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="export">
+            <i class="fa-solid fa-file-export"></i> {{localize "OKASSEN.tabs.export"}}
+        </button>
+        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="preview">
+            <i class="fa-solid fa-eye"></i> {{localize "OKASSEN.tabs.preview"}}
+        </button>
+        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="history">
+            <i class="fa-solid fa-clock-rotate-left"></i> {{localize "OKASSEN.tabs.history"}}
+        </button>
+        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="handlers">
+            <i class="fa-solid fa-code"></i> {{localize "OKASSEN.tabs.handlers"}}
+        </button>
+        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="guide">
+            <i class="fa-solid fa-book-open"></i> {{localize "OKASSEN.tabs.guide"}}
+        </button>
+        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="settings">
+            <i class="fa-solid fa-gear"></i> {{localize "OKASSEN.tabs.settings"}}
+        </button>
+    </nav>
+
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Импорт»: редактор слева, «Назначение» справа.        --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab active" data-tab="import">
+        <p class="okassen-hint">{{localize "OKASSEN.import.hint"}}</p>
+
+        <div class="okassen-import-grid">
+            {{!-- Левая колонка: редактор + статус + сообщение + кнопки --}}
+            <div class="okassen-import-main-col">
+                {{!-- Редактор JSON: номера строк + подсветка. Под прозрачным
+                      textarea лежит pre с раскрашенной копией (см. editor.js) --}}
+                <div class="okassen-editor">
+                    <div class="okassen-gutter" aria-hidden="true"></div>
+                    <div class="okassen-editor-main">
+                        <pre class="okassen-highlight" aria-hidden="true"><code></code></pre>
+                        <textarea class="okassen-json" spellcheck="false" wrap="off"
+                                  placeholder="{{localize 'OKASSEN.import.placeholder'}}"></textarea>
+                    </div>
+                </div>
+
+                {{!-- Статус-строка: живая валидация JSON + кнопка форматирования --}}
+                <div class="okassen-editor-status">
+                    <span class="okassen-status-text"></span>
+                    <button type="button" data-action="format" class="okassen-format-btn">
+                        <i class="fa-solid fa-align-left"></i> {{localize "OKASSEN.editor.format"}}
+                    </button>
+                </div>
+
+                {{!-- Тултип-подсказка: описание механики под кареткой --}}
+                <div class="okassen-hint-line"></div>
+
+                {{!-- Сообщение об ошибке/успехе — прямо в окне, не в консоли --}}
+                <div class="okassen-message" hidden></div>
+
+                {{!-- Кнопки. type="button" — намеренно: без submit-поведения формы --}}
+                <footer class="okassen-buttons">
+                    <button type="button" data-action="create" class="okassen-btn-primary">
+                        <i class="fa-solid fa-hammer"></i> {{localize "OKASSEN.import.create"}}
+                    </button>
+                    <button type="button" data-action="example">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "OKASSEN.import.example"}}
+                    </button>
+                    <button type="button" data-action="fromUrl">
+                        <i class="fa-solid fa-link"></i> {{localize "OKASSEN.url.button"}}
+                    </button>
+                    <button type="button" data-action="clear">
+                        <i class="fa-solid fa-eraser"></i> {{localize "OKASSEN.import.clear"}}
+                    </button>
+                </footer>
+            </div>
+
+            {{!-- Правая колонка: карточка «Назначение» --}}
+            <aside class="okassen-dest-card">
+                <h3 class="okassen-dest-title">
+                    <i class="fa-solid fa-crosshairs"></i> {{localize "OKASSEN.dest.title"}}
+                </h3>
+
+                <label class="okassen-dest-label">{{localize "OKASSEN.import.target"}}</label>
+                <input type="text" class="okassen-target" placeholder="Actor.a1b2c3d4e5f6...">
+                <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.import.targetHint"}}</p>
+
+                <label class="okassen-dest-label">{{localize "OKASSEN.import.folder"}}</label>
+                <select class="okassen-folder">
+                    <option value="">{{localize "OKASSEN.import.folderRoot"}}</option>
+                    {{#if folders.items.length}}
+                    <optgroup label="{{localize 'DOCUMENT.Items'}}">
+                        {{#each folders.items}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
+                    </optgroup>
+                    {{/if}}
+                    {{#if folders.actors.length}}
+                    <optgroup label="{{localize 'DOCUMENT.Actors'}}">
+                        {{#each folders.actors}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
+                    </optgroup>
+                    {{/if}}
+                </select>
+                <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.import.folderHint"}}</p>
+
+                <label class="okassen-dest-label">{{localize "OKASSEN.import.pack"}}</label>
+                <select class="okassen-pack">
+                    <option value="">{{localize "OKASSEN.import.packNone"}}</option>
+                    {{#if packs.items.length}}
+                    <optgroup label="{{localize 'DOCUMENT.Items'}}">
+                        {{#each packs.items}}<option value="{{this.id}}" {{#if this.locked}}disabled{{/if}}>{{this.name}}</option>{{/each}}
+                    </optgroup>
+                    {{/if}}
+                    {{#if packs.actors.length}}
+                    <optgroup label="{{localize 'DOCUMENT.Actors'}}">
+                        {{#each packs.actors}}<option value="{{this.id}}" {{#if this.locked}}disabled{{/if}}>{{this.name}}</option>{{/each}}
+                    </optgroup>
+                    {{/if}}
+                </select>
+                <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.import.packHint"}}</p>
+            </aside>
         </div>
-    </div>
+    </section>
 
-    {{!-- Статус-строка: живая валидация JSON + кнопка форматирования --}}
-    <div class="okassen-editor-status">
-        <span class="okassen-status-text"></span>
-        <button type="button" data-action="format" class="okassen-format-btn">
-            <i class="fa-solid fa-align-left"></i> {{localize "OKASSEN.editor.format"}}
-        </button>
-    </div>
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Экспорт»: UUID → расширенный JSON в редактор Импорта. --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="export">
+        <p class="okassen-hint">{{localize "OKASSEN.export.tabHint"}}</p>
 
-    {{!-- Тултип-подсказка: описание механики, в значении которой стоит каретка --}}
-    <div class="okassen-hint-line"></div>
+        <label class="okassen-dest-label">{{localize "OKASSEN.export.uuidLabel"}}</label>
+        <input type="text" class="okassen-export-uuid" placeholder="Item.xxxx / Actor.xxxx / Folder.xxxx / world.my-items">
+        <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.export.tabTargets"}}</p>
 
-    {{!-- Необязательная цель: UUID актёра (пусто = создать в мире) --}}
-    <div class="okassen-target-row">
-        <label>{{localize "OKASSEN.import.target"}}</label>
-        <input type="text" class="okassen-target" placeholder="Actor.a1b2c3d4e5f6...">
-    </div>
-    <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.import.targetHint"}}</p>
+        <footer class="okassen-buttons">
+            <button type="button" data-action="export" class="okassen-btn-primary">
+                <i class="fa-solid fa-file-export"></i> {{localize "OKASSEN.export.button"}}
+            </button>
+        </footer>
 
-    {{!-- Папка, куда положить создаваемый документ (для импорта в мир) --}}
-    <div class="okassen-target-row">
-        <label>{{localize "OKASSEN.import.folder"}}</label>
-        <select class="okassen-folder">
-            <option value="">{{localize "OKASSEN.import.folderRoot"}}</option>
-            {{#if folders.items.length}}
-            <optgroup label="{{localize 'DOCUMENT.Items'}}">
-                {{#each folders.items}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
-            </optgroup>
-            {{/if}}
-            {{#if folders.actors.length}}
-            <optgroup label="{{localize 'DOCUMENT.Actors'}}">
-                {{#each folders.actors}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
-            </optgroup>
-            {{/if}}
-        </select>
-    </div>
-    <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.import.folderHint"}}</p>
+        <div class="okassen-export-msg okassen-message" hidden></div>
+    </section>
 
-    {{!-- Компендиум-цель: создание сразу в пак (пусто = мир/актёр) --}}
-    <div class="okassen-target-row">
-        <label>{{localize "OKASSEN.import.pack"}}</label>
-        <select class="okassen-pack">
-            <option value="">{{localize "OKASSEN.import.packNone"}}</option>
-            {{#if packs.items.length}}
-            <optgroup label="{{localize 'DOCUMENT.Items'}}">
-                {{#each packs.items}}<option value="{{this.id}}" {{#if this.locked}}disabled{{/if}}>{{this.name}}</option>{{/each}}
-            </optgroup>
-            {{/if}}
-            {{#if packs.actors.length}}
-            <optgroup label="{{localize 'DOCUMENT.Actors'}}">
-                {{#each packs.actors}}<option value="{{this.id}}" {{#if this.locked}}disabled{{/if}}>{{this.name}}</option>{{/each}}
-            </optgroup>
-            {{/if}}
-        </select>
-    </div>
-    <p class="okassen-hint okassen-hint-small">{{localize "OKASSEN.import.packHint"}}</p>
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Предпросмотр»: сухой прогон JSON из вкладки «Импорт». --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="preview">
+        <div class="okassen-tab-toolbar">
+            <button type="button" data-action="preview" class="okassen-btn-primary">
+                <i class="fa-solid fa-eye"></i> {{localize "OKASSEN.preview.run"}}
+            </button>
+        </div>
+        <div class="okassen-preview-content okassen-tab-scroll">
+            <p class="okassen-tab-empty">{{localize "OKASSEN.preview.tabEmpty"}}</p>
+        </div>
+    </section>
 
-    {{!-- Сообщение об ошибке/успехе — прямо в окне, не в консоли --}}
-    <div class="okassen-message" hidden></div>
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «История»: журнал импортов с откатом.                 --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="history">
+        <div class="okassen-tab-toolbar">
+            <button type="button" data-action="historyRefresh">
+                <i class="fa-solid fa-rotate"></i> {{localize "OKASSEN.history.refresh"}}
+            </button>
+        </div>
+        <div class="okassen-history-content okassen-tab-scroll"></div>
+    </section>
 
-    {{!-- Кнопки. type="button" — намеренно: никакого submit-поведения формы --}}
-    <footer class="okassen-buttons">
-        <button type="button" data-action="create">
-            <i class="fa-solid fa-hammer"></i> {{localize "OKASSEN.import.create"}}
-        </button>
-        <button type="button" data-action="example">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "OKASSEN.import.example"}}
-        </button>
-        <button type="button" data-action="guide">
-            <i class="fa-solid fa-book-open"></i> {{localize "OKASSEN.import.guide"}}
-        </button>
-        <button type="button" data-action="export">
-            <i class="fa-solid fa-file-export"></i> {{localize "OKASSEN.export.button"}}
-        </button>
-        <button type="button" data-action="clear">
-            <i class="fa-solid fa-eraser"></i> {{localize "OKASSEN.import.clear"}}
-        </button>
-    </footer>
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Обработчики»: onUse/хук-обработчики и ссылки на них.  --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="handlers">
+        <div class="okassen-tab-toolbar">
+            <button type="button" data-action="handlersRefresh">
+                <i class="fa-solid fa-rotate"></i> {{localize "OKASSEN.history.refresh"}}
+            </button>
+        </div>
+        <div class="okassen-handlers-content okassen-tab-scroll"></div>
+    </section>
 
-    {{!-- Второй ряд: инструменты (предпросмотр, история, URL, обработчики) --}}
-    <footer class="okassen-buttons okassen-buttons-tools">
-        <button type="button" data-action="preview">
-            <i class="fa-solid fa-eye"></i> {{localize "OKASSEN.preview.button"}}
-        </button>
-        <button type="button" data-action="fromUrl">
-            <i class="fa-solid fa-link"></i> {{localize "OKASSEN.url.button"}}
-        </button>
-        <button type="button" data-action="history">
-            <i class="fa-solid fa-clock-rotate-left"></i> {{localize "OKASSEN.history.button"}}
-        </button>
-        <button type="button" data-action="handlers">
-            <i class="fa-solid fa-code"></i> {{localize "OKASSEN.handlers.button"}}
-        </button>
-    </footer>
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Руководство»: встроенный гайд + открыть как журнал.   --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="guide">
+        <div class="okassen-tab-toolbar">
+            <button type="button" data-action="guide" class="okassen-btn-primary">
+                <i class="fa-solid fa-book-open"></i> {{localize "OKASSEN.guide.openJournal"}}
+            </button>
+        </div>
+        <div class="okassen-guide-content okassen-tab-scroll"></div>
+    </section>
+
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Настройки»: версия, зависимости, диагностика.        --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="settings">
+        <div class="okassen-settings-content okassen-tab-scroll"></div>
+    </section>
+
 </div>

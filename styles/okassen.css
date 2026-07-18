@@ -6,6 +6,215 @@
     margin: 4px;
 }
 
+/* ================================================================== */
+/* Вкладочный интерфейс окна импорта                                  */
+/* ================================================================== */
+
+.okassen-import .okassen-tabbed {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}
+
+/* Шапка вкладок */
+.okassen-import .okassen-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    border-bottom: 1px solid var(--color-border-dark, #4b4a44);
+    padding-bottom: 2px;
+}
+
+.okassen-import .okassen-tab-btn {
+    flex: 0 0 auto;
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 4px 4px 0 0;
+    color: inherit;
+    opacity: 0.7;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: opacity 0.1s, background 0.1s, border-color 0.1s;
+}
+
+.okassen-import .okassen-tab-btn:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.okassen-import .okassen-tab-btn.active {
+    opacity: 1;
+    border-bottom-color: #d0682a;
+    background: rgba(208, 104, 42, 0.12);
+    font-weight: bold;
+}
+
+/* Секции вкладок: все в DOM, видна только .active */
+.okassen-import .okassen-tab {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.okassen-import .okassen-tab.active {
+    display: flex;
+}
+
+/* Акцентная (первичная) кнопка */
+.okassen-import .okassen-btn-primary {
+    background: linear-gradient(180deg, #d0682a, #b4571f);
+    border: 1px solid #8f4417;
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.okassen-import .okassen-btn-primary:hover {
+    background: linear-gradient(180deg, #e07636, #c26124);
+}
+
+/* Панель инструментов над содержимым динамических вкладок */
+.okassen-import .okassen-tab-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.okassen-import .okassen-tab-toolbar button {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+}
+
+/* Прокручиваемая область содержимого вкладки */
+.okassen-import .okassen-tab-scroll {
+    max-height: 460px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.okassen-import .okassen-tab-empty {
+    opacity: 0.7;
+    font-style: italic;
+    margin: 8px 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Вкладка «Импорт»: две колонки — редактор и карточка «Назначение»    */
+/* ------------------------------------------------------------------ */
+.okassen-import .okassen-import-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 12px;
+    align-items: start;
+}
+
+.okassen-import .okassen-import-main-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* Узкое окно — колонки в стопку */
+@media (max-width: 720px) {
+    .okassen-import .okassen-import-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.okassen-import .okassen-dest-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border-dark, #4b4a44);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.okassen-import .okassen-dest-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 4px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+    font-size: var(--font-size-13, 13px);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.9;
+}
+
+.okassen-import .okassen-dest-label {
+    font-weight: bold;
+    font-size: var(--font-size-12, 12px);
+    margin-top: 4px;
+}
+
+.okassen-import .okassen-dest-card input,
+.okassen-import .okassen-dest-card select {
+    width: 100%;
+}
+
+.okassen-import .okassen-dest-card input {
+    font-family: var(--font-mono, monospace);
+}
+
+/* ------------------------------------------------------------------ */
+/* Вкладка «Настройки»: таблица версий и зависимостей                  */
+/* ------------------------------------------------------------------ */
+.okassen-import .okassen-settings-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0;
+}
+
+.okassen-import .okassen-settings-table th,
+.okassen-import .okassen-settings-table td {
+    text-align: left;
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    vertical-align: top;
+}
+
+.okassen-import .okassen-settings-table th {
+    width: 45%;
+    font-weight: bold;
+    opacity: 0.85;
+}
+
+.okassen-import .okassen-dep-ok { color: var(--color-level-success, #4caf50); font-weight: bold; }
+.okassen-import .okassen-dep-off { color: #999; }
+
+/* Встроенное руководство — читаемая ширина строк */
+.okassen-import .okassen-guide-content {
+    line-height: 1.5;
+}
+
+.okassen-import .okassen-guide-content pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.okassen-import .okassen-guide-content table {
+    border-collapse: collapse;
+    margin: 6px 0;
+}
+
+.okassen-import .okassen-guide-content th,
+.okassen-import .okassen-guide-content td {
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    padding: 3px 6px;
+    text-align: left;
+}
+
 /* Тело окна импорта */
 .okassen-import .okassen-import-body {
     display: flex;
