@@ -257,7 +257,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       icon: "fa-solid fa-file-import",
       resizable: true
     },
-    position: { width: 860, height: "auto" },
+    position: { width: 780, height: "auto" },
     // Обработчики на data-action (клик по кнопке), НЕ submit формы —
     // так нет конфликтов с поведением <form>.
     actions: {
@@ -308,11 +308,10 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     return context;
   }
 
-  /** Активная вкладка (data-tab). Сохраняется между ре-рендерами не нужно —
-   *  окно живёт одним рендером, вкладки переключаются классами. */
+  /** Активная вкладка окна (import/export/tools) — переживает ре-рендер. */
   #activeTab = "import";
 
-  /** После рендера — оживляем редактор и наполняем статичные вкладки. */
+  /** После рендера — оживляем редактор (номера строк, подсветка, Tab/Enter). */
   _onRender(context, options) {
     super._onRender(context, options);
     initJsonEditor(
@@ -324,114 +323,24 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         hintEl: this.element.querySelector(".okassen-hint-line")
       }
     );
-
-    // Руководство — статично, наполняем один раз при рендере.
-    const guideBox = this.element.querySelector(".okassen-guide-content");
-    if (guideBox) guideBox.innerHTML = GUIDE_HTML;
-
-    // Откат записей истории — делегирование на контейнер (кнопки data-undo
-    // создаются динамически в #renderHistory).
-    const histBox = this.element.querySelector(".okassen-history-content");
-    histBox?.addEventListener("click", async ev => {
-      const btn = ev.target.closest("[data-undo]");
-      if (!btn) return;
-      const ok = await foundry.applications.api.DialogV2.confirm({
-        window: { title: game.i18n.localize("OKASSEN.history.undo") },
-        content: `<p>${game.i18n.localize("OKASSEN.history.confirm")}</p>`
-      });
-      if (!ok) return;
-      btn.disabled = true;
-      try {
-        await rollbackImport(btn.dataset.undo);
-        this.#renderHistory();
-      } catch (err) {
-        btn.disabled = false;
-        ui.notifications.error(err.message);
-      }
-    });
+    // Восстанавливаем выбранную вкладку (после первого рендера — «import»).
+    this.#activateTab(this.#activeTab);
   }
 
-  /* ---------------------------------------------------------------- */
-  /* Вкладки                                                          */
-  /* ---------------------------------------------------------------- */
-
-  /** Клик по кнопке вкладки в шапке. */
+  /** Кнопка-вкладка: переключиться на неё. */
   static #onTab(_event, target) {
     this.#activateTab(target.dataset.tab);
   }
 
-  /**
-   * Переключить активную вкладку: погасить старую секцию/кнопку, зажечь новую
-   * и (для динамических вкладок) наполнить контент актуальными данными.
-   */
-  #activateTab(tab) {
-    this.#activeTab = tab;
-    for (const btn of this.element.querySelectorAll(".okassen-tab-btn")) {
-      btn.classList.toggle("active", btn.dataset.tab === tab);
+  /** Показать одну вкладку, спрятать остальные; подсветить её в nav. */
+  #activateTab(name) {
+    this.#activeTab = name;
+    for (const el of this.element.querySelectorAll(".okassen-tabs .item")) {
+      el.classList.toggle("active", el.dataset.tab === name);
     }
-    for (const sec of this.element.querySelectorAll(".okassen-tab")) {
-      sec.classList.toggle("active", sec.dataset.tab === tab);
+    for (const el of this.element.querySelectorAll(".okassen-tab")) {
+      el.classList.toggle("active", el.dataset.tab === name);
     }
-    if (tab === "preview") this.#renderPreview();
-    else if (tab === "history") this.#renderHistory();
-    else if (tab === "handlers") this.#renderHandlers();
-    else if (tab === "settings") this.#renderSettings();
-  }
-
-  /** Предпросмотр: сухой прогон JSON из редактора → HTML-сводка во вкладке. */
-  #renderPreview() {
-    const box = this.element.querySelector(".okassen-preview-content");
-    if (!box) return;
-    const raw = this.element.querySelector(".okassen-json").value;
-    if (!raw.trim()) {
-      box.innerHTML = `<p class="okassen-tab-empty">${game.i18n.localize("OKASSEN.preview.tabEmpty")}</p>`;
-      return;
-    }
-    let parsed;
-    try {
-      parsed = preprocess(JSON.parse(raw));
-    } catch (err) {
-      box.innerHTML = `<p class="okassen-preview-error">✖ ${escapeHtml(err.message)}</p>`;
-      return;
-    }
-    box.innerHTML = buildPreviewHtml(parsed);
-  }
-
-  /** История: список записей с кнопками отката (клики ловит делегат в _onRender). */
-  #renderHistory() {
-    const box = this.element.querySelector(".okassen-history-content");
-    if (box) box.innerHTML = buildHistoryHtml();
-  }
-
-  /** Обработчики: список onUse/хук-обработчиков и ссылок на них. */
-  #renderHandlers() {
-    const box = this.element.querySelector(".okassen-handlers-content");
-    if (box) box.innerHTML = buildHandlersHtml();
-  }
-
-  /** Настройки: версия модуля/формата, система и статус зависимостей. */
-  #renderSettings() {
-    const box = this.element.querySelector(".okassen-settings-content");
-    if (!box) return;
-    const L = k => game.i18n.localize(k);
-    const yes = `<span class="okassen-dep-ok">${L("OKASSEN.settings.active")}</span>`;
-    const no = `<span class="okassen-dep-off">${L("OKASSEN.settings.inactive")}</span>`;
-    const mod = game.modules.get(MODULE_ID);
-    const dae = game.modules.get("dae")?.active;
-    const historyCount = game.settings.get(MODULE_ID, "importHistory")?.length ?? 0;
-
-    const row = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
-    box.innerHTML = `
-      <table class="okassen-settings-table">
-        ${row(L("OKASSEN.settings.version"), escapeHtml(mod?.version ?? "?"))}
-        ${row(L("OKASSEN.settings.formatVersion"), escapeHtml(String(FORMAT_VERSION)))}
-        ${row(L("OKASSEN.settings.system"), `${escapeHtml(game.system.id)} v${escapeHtml(game.system.version)}`)}
-        ${row(L("OKASSEN.settings.core"), escapeHtml(game.version ?? game.data?.version ?? "?"))}
-        ${row("midi-qol", midiActive() ? yes : no)}
-        ${row("DAE", dae ? yes : no)}
-        ${row(L("OKASSEN.settings.historyCount"), String(historyCount))}
-      </table>
-      <p class="okassen-hint okassen-hint-small">${L("OKASSEN.settings.note")}</p>`;
   }
 
   /** Программно заменить текст в редакторе (событие input обновляет подсветку). */
@@ -613,6 +522,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       const text = await response.text();
       JSON.parse(text); // проверка ДО подстановки: мусор в редактор не тащим
       this.#setJson(text);
+      this.#activateTab("import"); // редактор — на вкладке «Импорт»
       this.#showMessage(game.i18n.format("OKASSEN.url.done", { url }), "success");
     } catch (err) {
       // Типичная причина — CORS: сервер не отдаёт файл браузеру напрямую.
@@ -685,6 +595,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
    * Результат кладётся в редактор вкладки «Импорт».
    */
   static async #onExport(_event, _target) {
+    // Экспорт берёт UUID из собственного поля на вкладке «Экспорт».
     const uuidStr = this.element.querySelector(".okassen-export-uuid").value.trim();
     if (!uuidStr) {
       this.#exportError(game.i18n.localize("OKASSEN.export.needUuid"));
@@ -699,7 +610,9 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         return;
       }
       const arr = await buildPackForgeJson(pack);
-      this.#exportDone(arr, game.i18n.format("OKASSEN.export.bulkDone", { count: arr.length, name: pack.metadata.label }));
+      this.#setJson(JSON.stringify(arr, null, 2));
+      this.#activateTab("import");
+      this.#showMessage(game.i18n.format("OKASSEN.export.bulkDone", { count: arr.length, name: pack.metadata.label }), "success");
       return;
     }
 
@@ -714,7 +627,9 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         return;
       }
       const arr = await buildFolderForgeJson(doc);
-      this.#exportDone(arr, game.i18n.format("OKASSEN.export.bulkDone", { count: arr.length, name: doc.name }));
+      this.#setJson(JSON.stringify(arr, null, 2));
+      this.#activateTab("import");
+      this.#showMessage(game.i18n.format("OKASSEN.export.bulkDone", { count: arr.length, name: doc.name }), "success");
       return;
     }
 
@@ -723,7 +638,9 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       return;
     }
     const json = await buildForgeJson(doc);
-    this.#exportDone(json, game.i18n.format("OKASSEN.export.done", { name: doc.name }));
+    this.#setJson(JSON.stringify(json, null, 2));
+    this.#activateTab("import");
+    this.#showMessage(game.i18n.format("OKASSEN.export.done", { name: doc.name }), "success");
   }
 }
 
