@@ -265,10 +265,11 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       icon: "fa-solid fa-file-import",
       resizable: true
     },
-    position: { width: 620, height: "auto" },
+    position: { width: 780, height: "auto" },
     // Обработчики на data-action (клик по кнопке), НЕ submit формы —
     // так нет конфликтов с поведением <form>.
     actions: {
+      tab: OkassenImportDialog.#onTab,
       create: OkassenImportDialog.#onCreate,
       clear: OkassenImportDialog.#onClear,
       example: OkassenImportDialog.#onExample,
@@ -315,6 +316,9 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     return context;
   }
 
+  /** Активная вкладка окна (import/export/tools) — переживает ре-рендер. */
+  #activeTab = "import";
+
   /** После рендера — оживляем редактор (номера строк, подсветка, Tab/Enter). */
   _onRender(context, options) {
     super._onRender(context, options);
@@ -327,6 +331,24 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         hintEl: this.element.querySelector(".okassen-hint-line")
       }
     );
+    // Восстанавливаем выбранную вкладку (после первого рендера — «import»).
+    this.#activateTab(this.#activeTab);
+  }
+
+  /** Кнопка-вкладка: переключиться на неё. */
+  static #onTab(_event, target) {
+    this.#activateTab(target.dataset.tab);
+  }
+
+  /** Показать одну вкладку, спрятать остальные; подсветить её в nav. */
+  #activateTab(name) {
+    this.#activeTab = name;
+    for (const el of this.element.querySelectorAll(".okassen-tabs .item")) {
+      el.classList.toggle("active", el.dataset.tab === name);
+    }
+    for (const el of this.element.querySelectorAll(".okassen-tab")) {
+      el.classList.toggle("active", el.dataset.tab === name);
+    }
   }
 
   /** Программно заменить текст в редакторе (событие input обновляет подсветку). */
@@ -504,6 +526,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       const text = await response.text();
       JSON.parse(text); // проверка ДО подстановки: мусор в редактор не тащим
       this.#setJson(text);
+      this.#activateTab("import"); // редактор — на вкладке «Импорт»
       this.#showMessage(game.i18n.format("OKASSEN.url.done", { url }), "success");
     } catch (err) {
       // Типичная причина — CORS: сервер не отдаёт файл браузеру напрямую.
@@ -568,7 +591,8 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
    *  - id компендиума ("world.my-items") — весь пак, массивом.
    */
   static async #onExport(_event, _target) {
-    const uuidStr = this.element.querySelector(".okassen-target").value.trim();
+    // Экспорт берёт UUID из собственного поля на вкладке «Экспорт».
+    const uuidStr = this.element.querySelector(".okassen-export-uuid").value.trim();
     if (!uuidStr) {
       this.#showMessage(game.i18n.localize("OKASSEN.export.needUuid"));
       return;
@@ -583,6 +607,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       const arr = await buildPackForgeJson(pack);
       this.#setJson(JSON.stringify(arr, null, 2));
+      this.#activateTab("import");
       this.#showMessage(game.i18n.format("OKASSEN.export.bulkDone", { count: arr.length, name: pack.metadata.label }), "success");
       return;
     }
@@ -599,6 +624,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       const arr = await buildFolderForgeJson(doc);
       this.#setJson(JSON.stringify(arr, null, 2));
+      this.#activateTab("import");
       this.#showMessage(game.i18n.format("OKASSEN.export.bulkDone", { count: arr.length, name: doc.name }), "success");
       return;
     }
@@ -609,6 +635,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     const json = await buildForgeJson(doc);
     this.#setJson(JSON.stringify(json, null, 2));
+    this.#activateTab("import");
     this.#showMessage(game.i18n.format("OKASSEN.export.done", { name: doc.name }), "success");
   }
 }
