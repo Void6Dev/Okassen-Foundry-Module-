@@ -1,0 +1,387 @@
+{
+  "name": "Продитрикс",
+  "type": "npc",
+  "img": "icons/svg/mystery-man.svg",
+  "prototypeToken": {
+    "name": "Продитрикс",
+    "displayName": 20,
+    "displayBars": 40,
+    "actorLink": false,
+    "disposition": -1,
+    "width": 1,
+    "height": 1,
+    "bar1": { "attribute": "attributes.hp" },
+    "sight": { "enabled": true, "range": 60, "visionMode": "darkvision" }
+  },
+  "system": {
+    "details": {
+      "cr": 6,
+      "xp": { "value": 2300 },
+      "type": { "value": "fey", "subtype": "ведьма" },
+      "alignment": "Нейтрально-злая",
+      "biography": {
+        "value": "<p><strong>Продитрикс — Ведьма Духа Обмана.</strong> Древняя (столетия жизни), не человек.</p><h2>Тактика в бою</h2><ul><li><strong>Раунды 1–2:</strong> «Рассказ о себе» + скрытое рисование пентаграммы (медленное затягивание).</li><li><strong>Раунд 3:</strong> активация пентаграммы, заклинания (Призрачная паутина, Шёпот сомненья).</li><li><strong>Раунды 4–5:</strong> комбинирование атак посохом и магии, усиление иллюзий.</li><li><strong>При HP &lt; 10% (≈6 HP):</strong> легендарное действие «Отступление в пещеру».</li><li><strong>При опасности:</strong> Misty Step, визуальный хаос из иллюзий, бегство вглубь пещеры.</li></ul><h2>Слабости и уязвимости</h2><ul><li><strong>Dispel Magic</strong> — развеивает пентаграмму и иллюзии.</li><li><strong>Шляпа</strong> — если её снять или сбить, DC всех её спасбросков падают на −2, ведьма раздражается и начинает ошибаться в тактике.</li><li><strong>Магическое оружие / магия</strong> — прерывает регенерацию на следующий раунд.</li><li><strong>Свет</strong> — факелы и магический свет в тёмной пещере могут нарушить иллюзии.</li></ul>"
+      }
+    },
+    "attributes": {
+      "hp": { "value": 56, "max": 56, "formula": "8d8 + 16" },
+      "ac": { "flat": 11, "calc": "natural" },
+      "movement": { "walk": 30 },
+      "senses": { "darkvision": 60 }
+    },
+    "abilities": {
+      "str": { "value": 8 },
+      "dex": { "value": 12 },
+      "con": { "value": 13 },
+      "int": { "value": 18 },
+      "wis": { "value": 17 },
+      "cha": { "value": 15 }
+    },
+    "skills": {
+      "his": { "value": 1 },
+      "ins": { "value": 1 },
+      "sur": { "value": 1 },
+      "med": { "value": 0.5 }
+    },
+    "traits": { "size": "med" }
+  },
+  "_forge": {
+    "effects": [
+      {
+        "label": "Дух Обмана — чутьё на ложь",
+        "icon": "icons/magic/perception/eye-ringed-glow-angry-small-red.webp",
+        "disabled": false,
+        "changes": [
+          { "mechanic": "skill.ins.bonus", "value": 20 },
+          { "key": "system.skills.ins.bonuses.passive", "mode": 2, "value": "20" }
+        ]
+      }
+    ]
+  },
+  "items": [
+    {
+      "name": "Дух Обмана (пассивно)",
+      "type": "feat",
+      "img": "icons/magic/perception/third-eye-blue-red.webp",
+      "system": {
+        "description": {
+          "value": "<p>Продитрикс <strong>чувствует ложь физически</strong> — распознаёт истину и ложь в чужих словах и действиях по малейшим сомнениям, несоответствиям и микровыражениям.</p><ul><li>DC проверки Обмана против Продитрикс = <strong>20</strong> (практически невозможно её обмануть).</li><li>Пассивный Insight сильно завышен (бонус +20 от духа уже включён Active Effect'ом на актёре — и к проверке, и к пассивному значению).</li></ul>"
+        }
+      }
+    },
+    {
+      "name": "Регенерация Ведьмы (пассивно)",
+      "type": "feat",
+      "img": "icons/magic/life/heart-cross-strong-green.webp",
+      "system": {
+        "description": {
+          "value": "<p>Восстанавливает <strong>5 HP в начале своего хода</strong> (реализовано эффектом heal.overTime → с активным MidiQOL это <code>flags.midi-qol.OverTime</code>, срабатывает автоматически в начале хода).</p><p><strong>Исключение (автоматически):</strong> регенерация не срабатывает, пока на актёре стоит флаг <code>flags.okassen.regenBlocked</code> (см. поле <code>condition</code> у эффекта). Когда Продитрикс получает урон от магического оружия/магии, ГМ ставит флаг одним кликом-макросом: <code>token.actor.setFlag('okassen','regenBlocked',true)</code>, а в начале её хода снимает. Пока флаг стоит — регенерация пропускается сама.</p>"
+        }
+      },
+      "_forge": {
+        "effects": [
+          {
+            "label": "Регенерация",
+            "icon": "icons/magic/life/heart-cross-strong-green.webp",
+            "disabled": false,
+            "transfer": true,
+            "changes": [
+              { "mechanic": "heal.overTime", "value": "5", "turn": "start", "condition": "!@flags.okassen.regenBlocked" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Мастер Иллюзий (пассивно)",
+      "type": "feat",
+      "img": "icons/magic/control/hypnosis-mesmerism-eye.webp",
+      "system": {
+        "description": {
+          "value": "<p>Каждый персонаж видит <strong>индивидуальную иллюзию</strong>, отражающую его страхи и желания.</p><ul><li>Проверка Интеллекта (Расследование) <strong>DC 16</strong> — понять, что что-то не так.</li><li>Проверка Мудрости (Внимание) <strong>DC 14</strong> — заметить «зазоры» в иллюзии (странные детали, несоответствия).</li></ul>"
+        }
+      }
+    },
+    {
+      "name": "Рассказ о Себе и Тайная Пентаграмма",
+      "type": "feat",
+      "img": "icons/magic/symbols/pentagram-glowing-red.webp",
+      "system": {
+        "description": {
+          "value": "<p><strong>Действие: скрытое.</strong> Продитрикс начинает рассказывать о себе — исповедуется, вспоминает, рассуждает о своей природе. В это же время она тайно рисует пентаграмму рукой: движения мелкие, суетливые, замаскированные под обычные жесты.</p><ul><li>Проверка Восприятия <strong>DC 16</strong> — наблюдающий персонаж замечает суетливые движения.</li><li>Готовая пентаграмма видна при пристальном взгляде: Восприятие <strong>DC 14</strong> (на полу/земле).</li></ul>",
+          "chat": "Продитрикс что-то увлечённо рассказывает о себе… (Восприятие DC 16, чтобы заметить движения её руки)"
+        },
+        "activities": {
+          "prdxtale00000001": {
+            "_id": "prdxtale00000001",
+            "type": "utility",
+            "name": "Рисование пентаграммы (скрытно)",
+            "activation": { "type": "action" }
+          }
+        }
+      }
+    },
+    {
+      "name": "Активация Пентаграммы",
+      "type": "feat",
+      "img": "icons/magic/symbols/runes-star-magenta.webp",
+      "system": {
+        "description": {
+          "value": "<p><strong>Действие. Требует уже нарисованной пентаграммы.</strong> Пентаграмма начинает светиться и туманиться.</p><p><strong>Затуманивание разума:</strong> все существа внутри пентаграммы (радиус ~20 футов) совершают спасбросок Мудрости <strong>DC 15</strong> в конце каждого своего хода. При провале — «Помутнение разума»:</p><ul><li>помеха к проверкам Мудрости;</li><li>помеха к спасброскам против магии обмана (Мудрость);</li><li>помеха ко всем атакам.</li></ul><p><strong>MidiQOL (автоматически):</strong> эффект «Помутнение разума» привязан к активности через <code>applyTo</code> — MidiQOL сам накладывает его на тех, кто <em>провалил</em> спасбросок. Вручную тащить не нужно.</p><p><strong>Накопление (каждый раунд в пентаграмме):</strong></p><ol><li>1-й раунд — помутнение;</li><li>2-й раунд — усиление (помеха на всё);</li><li>3-й раунд — полный контроль, как по заклинанию Charm Person (DC 15).</li></ol><p><strong>Длительность:</strong> пока Продитрикс сосредоточена (максимум 10 раундов).</p>"
+        },
+        "activities": {
+          "prdxpenta0000001": {
+            "_id": "prdxpenta0000001",
+            "type": "save",
+            "name": "Затуманивание разума",
+            "activation": { "type": "action" },
+            "target": { "template": { "type": "radius", "size": "20" } },
+            "save": {
+              "ability": ["wis"],
+              "dc": { "calculation": "", "formula": "15" }
+            },
+            "damage": { "onSave": "none", "parts": [] }
+          }
+        }
+      },
+      "_forge": {
+        "effects": [
+          {
+            "id": "mindfog",
+            "label": "Помутнение разума",
+            "icon": "icons/magic/control/fear-fright-white.webp",
+            "disabled": false,
+            "transfer": false,
+            "duration": { "rounds": 10 },
+            "applyTo": ["prdxpenta0000001"],
+            "changes": [
+              { "mechanic": "disadvantage.attack.all", "value": 1 },
+              { "mechanic": "disadvantage.ability.check.wis", "value": 1 },
+              { "mechanic": "disadvantage.ability.save.wis", "value": 1 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Призрачная Паутина",
+      "type": "feat",
+      "img": "icons/creatures/webs/web-spider-glowing-purple.webp",
+      "system": {
+        "description": {
+          "value": "<p><em>Заклинание 2-го уровня.</em> <strong>Действие.</strong> Дальность 60 футов, область — цилиндр 15 футов.</p><p>Спасбросок Ловкости <strong>DC 15</strong>. При провале цель получает <strong>замедление</strong>: скорость −50%, нет бонусных действий.</p><p><strong>3 раза в день.</strong> Эффект «Замедление паутины» привязан через <code>applyTo</code> — MidiQOL накладывает его на провалившую цель сам (скорость ×0.5); запрет бонусных действий — вручную (в 5e/Midi нет отдельного флага «нет бонусного действия»).</p>"
+        },
+        "uses": {
+          "spent": 0,
+          "max": "3",
+          "recovery": [ { "period": "day", "type": "recoverAll" } ]
+        },
+        "activities": {
+          "prdxweb000000001": {
+            "_id": "prdxweb000000001",
+            "type": "save",
+            "name": "Паутина",
+            "activation": { "type": "action" },
+            "range": { "value": "60", "units": "ft" },
+            "target": { "template": { "type": "cylinder", "size": "15" } },
+            "save": {
+              "ability": ["dex"],
+              "dc": { "calculation": "", "formula": "15" }
+            },
+            "damage": { "onSave": "none", "parts": [] },
+            "consumption": {
+              "targets": [ { "type": "itemUses", "value": "1" } ]
+            }
+          }
+        }
+      },
+      "_forge": {
+        "effects": [
+          {
+            "id": "webslow",
+            "label": "Замедление паутины",
+            "icon": "icons/creatures/webs/web-spider-glowing-purple.webp",
+            "disabled": false,
+            "transfer": false,
+            "duration": { "rounds": 10 },
+            "applyTo": ["prdxweb000000001"],
+            "changes": [
+              { "key": "system.attributes.movement.walk", "mode": 1, "value": "0.5" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Шёпот Сомненья",
+      "type": "feat",
+      "img": "icons/magic/sonic/scream-wail-shout-teal.webp",
+      "system": {
+        "description": {
+          "value": "<p><em>Заклинание 2-го уровня.</em> <strong>Бонусное действие.</strong> Дальность 60 футов.</p><p>Спасбросок Мудрости <strong>DC 15</strong>. При провале: <strong>2d6 психического урона</strong> + помеха к следующей атаке цели.</p><p><strong>2 раза в день.</strong> Эффект «Сомнение» привязан через <code>applyTo</code> (MidiQOL накладывает на провалившего) и держится 1 раунд — ядро Foundry v14 снимает его само по истечении длительности. Практически цель успевает сделать одну атаку с помехой; если хотите снять строго после её первой атаки, снимите эффект вручную (флаг-триггер «1Attack» был функцией Times-Up, которого для v14 нет).</p>"
+        },
+        "uses": {
+          "spent": 0,
+          "max": "2",
+          "recovery": [ { "period": "day", "type": "recoverAll" } ]
+        },
+        "activities": {
+          "prdxwhisper00001": {
+            "_id": "prdxwhisper00001",
+            "type": "save",
+            "name": "Шёпот",
+            "activation": { "type": "bonus" },
+            "range": { "value": "60", "units": "ft" },
+            "save": {
+              "ability": ["wis"],
+              "dc": { "calculation": "", "formula": "15" }
+            },
+            "damage": {
+              "onSave": "none",
+              "parts": [
+                { "number": 2, "denomination": 6, "bonus": "", "types": ["psychic"] }
+              ]
+            },
+            "consumption": {
+              "targets": [ { "type": "itemUses", "value": "1" } ]
+            }
+          }
+        }
+      },
+      "_forge": {
+        "effects": [
+          {
+            "id": "whisperdoubt",
+            "label": "Сомнение (помеха следующей атаке)",
+            "icon": "icons/magic/sonic/scream-wail-shout-teal.webp",
+            "disabled": false,
+            "transfer": false,
+            "duration": { "rounds": 1 },
+            "applyTo": ["prdxwhisper00001"],
+            "changes": [
+              { "mechanic": "disadvantage.attack.all", "value": 1 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Посох Раздвоенного Огня",
+      "type": "weapon",
+      "img": "icons/weapons/staves/staff-forest-jewel.webp",
+      "system": {
+        "description": {
+          "value": "<p>Тёмное дерево с расщеплёнными когтями. Внутри горит <strong>зелёное пламя</strong> — оно не греет окружающее, но жжёт живую плоть.</p><ul><li><strong>Сжигание</strong> (действие): атака в ближнем бою, 2d6 некротического урона.</li><li><strong>Испепеление</strong> (действие): линия 15 футов, 2d6 некротического урона, спасбросок Мудрости DC 13 — половина.</li></ul>"
+        },
+        "equipped": true,
+        "proficient": 1,
+        "type": { "value": "simpleM", "baseItem": "quarterstaff" },
+        "damage": {
+          "base": { "number": 2, "denomination": 6, "bonus": "", "types": ["necrotic"] }
+        },
+        "activities": {
+          "prdxstaffatk0001": {
+            "_id": "prdxstaffatk0001",
+            "type": "attack",
+            "name": "Сжигание",
+            "activation": { "type": "action" },
+            "attack": {
+              "ability": "",
+              "bonus": "",
+              "type": { "value": "melee", "classification": "weapon" }
+            },
+            "damage": { "includeBase": true, "parts": [] }
+          },
+          "prdxstaffline001": {
+            "_id": "prdxstaffline001",
+            "type": "save",
+            "name": "Испепеление",
+            "activation": { "type": "action" },
+            "target": { "template": { "type": "line", "size": "15" } },
+            "save": {
+              "ability": ["wis"],
+              "dc": { "calculation": "", "formula": "13" }
+            },
+            "damage": {
+              "onSave": "half",
+              "parts": [
+                { "number": 2, "denomination": 6, "bonus": "", "types": ["necrotic"] }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Жучиные Камни",
+      "type": "consumable",
+      "img": "icons/commodities/stone/geode-raw-black.webp",
+      "system": {
+        "description": {
+          "value": "<p>Метательные камни. При попадании создают <strong>облако дыма радиусом 3 метра</strong> (сильно заслонённая область).</p><p>Всего <strong>6 штук</strong> — каждый бросок тратит один камень.</p>"
+        },
+        "type": { "value": "trinket" },
+        "quantity": 6,
+        "uses": {
+          "spent": 0,
+          "max": "6",
+          "recovery": [],
+          "autoDestroy": false
+        },
+        "activities": {
+          "prdxstones000001": {
+            "_id": "prdxstones000001",
+            "type": "utility",
+            "name": "Бросок камня (облако дыма)",
+            "activation": { "type": "action" },
+            "range": { "value": "30", "units": "ft" },
+            "target": { "template": { "type": "radius", "size": "10" } },
+            "consumption": {
+              "targets": [ { "type": "itemUses", "value": "1" } ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Легендарное Действие: Отступление в Пещеру",
+      "type": "feat",
+      "img": "icons/environment/wilderness/cave-entrance-vulcano.webp",
+      "system": {
+        "description": {
+          "value": "<p><strong>Триггер:</strong> HP Продитрикс падает до 10% (≈6 из 56).</p><p>В свой ход она отступает в глубину пещеры и создаёт мощную комбо-иллюзию. Каждый персонаж видит свою версию в зависимости от страхов и желаний:</p><ul><li><strong>Золотой дворец</strong> — величественный, сверкающий, с шёлковыми занавесями;</li><li><strong>Трёхголовая гидра</strong> — огромная, чешуйчатая, с горящими глазами;</li><li><strong>Цепи</strong> — персонажи видят себя прикованными к стульям.</li></ul><h3>Распознавание иллюзии</h3><ul><li>Спасбросок Интеллекта (Расследование) <strong>DC 17</strong> → понимает, что это иллюзия;</li><li>Спасбросок Мудрости (Внимание) <strong>DC 16</strong> → понимает, что это иллюзия;</li><li>Осмотр деталей (действие): проверка Интеллекта <strong>DC 14</strong> — при успехе видит несоответствия.</li></ul><h3>Пока персонаж в иллюзии</h3><ul><li>Видит, как гидра движется на него: <strong>2d6 психического урона каждый раунд</strong> (спасбросок Мудрости DC 15 — половина; активность «Гидра» на этом предмете);</li><li>Ощущение безопасности или паники — персонаж верит в гидру.</li></ul><h3>Цепи (иллюзорные, неосязаемые)</h3><ul><li>Выглядят реальными, но не существуют;</li><li>Разорвать: проверка Силы <strong>DC 12</strong>;</li><li>При провале иллюзия усиливается: дополнительно <strong>1d6 психического урона</strong>.</li></ul><h3>Когда иллюзия развеяна</h3><p>Персонаж видит настоящую пещеру: каменные стены, мерцающий свет. Продитрикс стоит с ножом в руке: <em>«Ах, вы проснулись? Как жаль… я только собиралась начать веселье».</em> Она отвлекает боем, держась на расстоянии, готовая сбежать.</p><h3>Режим бегства</h3><p>Если более половины группы освобождается за один раунд: Misty Step / телепортация через иллюзии, визуальный хаос из множества иллюзий, бегство в глубины пещеры. Поймать её — проверка Отслеживания <strong>DC 18</strong>.</p><p><strong>Если поймали</strong> — смерть; легендарное действие больше не срабатывает. Конец боя.</p>"
+        },
+        "activities": {
+          "prdxretreat00001": {
+            "_id": "prdxretreat00001",
+            "type": "save",
+            "name": "Гидра (психический урон в иллюзии)",
+            "activation": { "type": "special" },
+            "save": {
+              "ability": ["wis"],
+              "dc": { "calculation": "", "formula": "15" }
+            },
+            "damage": {
+              "onSave": "half",
+              "parts": [
+                { "number": 2, "denomination": 6, "bonus": "", "types": ["psychic"] }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Шляпа Продитрикс",
+      "type": "equipment",
+      "img": "icons/equipment/head/hat-pointed-blue.webp",
+      "system": {
+        "description": {
+          "value": "<p>Шляпа — не просто аксессуар (видна на арте).</p><ul><li>Если шляпу <strong>снять или сбить</strong> — Продитрикс теряет преимущество в иллюзиях: <strong>DC всех её спасбросков падают на −2</strong> (ГМ применяет вручную к активностям);</li><li>Она становится <strong>раздражённой</strong> — редкий момент, когда она теряет контроль над собой;</li><li>Может начать делать ошибки в боевой тактике;</li><li>Хороший крючок для находчивых персонажей.</li></ul>"
+        },
+        "equipped": true,
+        "type": { "value": "clothing" }
+      }
+    }
+  ]
+}

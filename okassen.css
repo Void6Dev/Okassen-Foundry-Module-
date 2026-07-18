@@ -1,0 +1,430 @@
+/* Okassen: Better JSON Integration — стили окна импорта и кнопки в сайдбаре */
+
+/* Кнопка в шапке сайдбара предметов */
+.okassen-import-button {
+    flex: 0 0 auto;
+    margin: 4px;
+}
+
+/* Тело окна импорта */
+.okassen-import .okassen-import-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}
+
+.okassen-import .okassen-hint {
+    margin: 0;
+    opacity: 0.8;
+    font-size: var(--font-size-13, 13px);
+}
+
+.okassen-import .okassen-hint-small {
+    font-size: var(--font-size-11, 11px);
+    margin-top: -4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Редактор JSON «как в IDE»: гаттер с номерами строк + прозрачный     */
+/* textarea поверх раскрашенного pre (см. editor.js)                   */
+/* ------------------------------------------------------------------ */
+.okassen-import .okassen-editor {
+    display: flex;
+    height: 340px;
+    resize: vertical;
+    overflow: hidden;
+    border: 1px solid var(--color-border-dark, #4b4a44);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* КРИТИЧНО: оба слоя (pre-подсветка и textarea) обязаны иметь ПОПИКСЕЛЬНО
+   одинаковые метрики текста, иначе слои разъезжаются. Foundry задаёт свои
+   стили для pre/code (шрифт Roboto 14px/17.5px, рамка у code — «чипы» кода
+   в журналах), и они выигрывают у обычных правил модуля. Поэтому здесь
+   !important — это осознанно: полпикселя разницы line-height на 40 строках
+   дают смещение на целую строку. */
+.okassen-import .okassen-gutter,
+.okassen-import .okassen-highlight,
+.okassen-import .okassen-highlight code,
+.okassen-import .okassen-json {
+    font-family: Consolas, "Courier New", monospace !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+    font-weight: normal !important;
+    letter-spacing: normal !important;
+    tab-size: 2;
+    box-sizing: border-box;
+}
+
+/* Запрет переноса строк на слое подсветки + сброс «чипового» оформления code
+   (рамка/фон/отступы Foundry смещали текст на доли пикселя). */
+.okassen-import .okassen-highlight,
+.okassen-import .okassen-highlight code {
+    white-space: pre !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    border: none !important;
+    background: transparent !important;
+    margin: 0 !important;
+}
+
+.okassen-import .okassen-highlight code {
+    /* code — блок с теми же отступами, что у textarea (8px), сдвигается transform'ом */
+    padding: 8px !important;
+    display: block !important;
+}
+
+/* Гаттер: номера строк. Сам гаттер — вьюпорт (overflow hidden),
+   двигается внутренний .okassen-gutter-inner через transform. */
+.okassen-import .okassen-gutter {
+    flex: 0 0 auto;
+    min-width: 2.6em;
+    overflow: hidden;
+    text-align: right;
+    white-space: pre;
+    color: rgba(160, 160, 160, 0.6);
+    background: rgba(255, 255, 255, 0.04);
+    border-right: 1px solid rgba(128, 128, 128, 0.25);
+    user-select: none;
+}
+
+.okassen-import .okassen-gutter-inner {
+    padding: 8px 6px 8px 4px;
+    will-change: transform;
+}
+
+.okassen-import .okassen-editor-main {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Раскрашенная копия текста. pre — неподвижный вьюпорт, «скроллится»
+   внутренний code через transform (см. syncScroll в editor.js). */
+.okassen-import .okassen-highlight {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    white-space: pre;
+    pointer-events: none;
+    border: none;
+    background: transparent;
+}
+
+.okassen-import .okassen-highlight code {
+    color: #d5d5ca; /* обычный текст */
+    background: transparent;
+    width: max-content;
+    min-width: 100%;
+    will-change: transform;
+}
+
+/* Сам textarea: текст прозрачный (цвета рисует pre), каретка видимая.
+   -webkit-text-fill-color дублирует прозрачность на случай, если тема
+   Foundry переопределяет color у textarea. */
+.okassen-import .okassen-json {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 8px;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    resize: none;
+    overflow: auto;
+    white-space: pre;
+    background: transparent;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: #e8e8dc;
+}
+
+.okassen-import .okassen-json::selection {
+    background: rgba(100, 140, 255, 0.30);
+}
+
+.okassen-import .okassen-json::placeholder {
+    color: rgba(170, 170, 170, 0.45);
+}
+
+/* Токены подсветки (палитра в духе тёмных тем IDE) */
+.okassen-import .json-key { color: #6fb8ff; }
+.okassen-import .json-string { color: #d9a066; }
+.okassen-import .json-num { color: #9fd08a; }
+.okassen-import .json-literal { color: #569cd6; }
+.okassen-import .json-punct { color: #9aa0a6; }
+
+/* Подсвеченная пара скобок у курсора */
+.okassen-import .bracket-match {
+    background: rgba(100, 140, 255, 0.35);
+    outline: 1px solid rgba(100, 140, 255, 0.8);
+    border-radius: 2px;
+}
+
+/* Попап автодополнения механик (Ctrl+Space) */
+.okassen-import .okassen-complete {
+    position: absolute;
+    z-index: 10;
+    width: 280px;
+    max-height: 180px;
+    overflow-y: auto;
+    background: #1e1f22;
+    border: 1px solid #4b4a44;
+    border-radius: 4px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+    font-size: 11px;
+    pointer-events: all;
+}
+
+.okassen-import .okassen-complete-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.okassen-import .okassen-complete-item.active,
+.okassen-import .okassen-complete-item:hover {
+    background: rgba(100, 140, 255, 0.25);
+}
+
+.okassen-import .okassen-complete-item .cc-label {
+    color: #6fb8ff;
+    flex: 0 0 auto;
+}
+
+.okassen-import .okassen-complete-item .cc-detail {
+    color: #8b8b8b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.okassen-import .okassen-target-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.okassen-import .okassen-target-row label {
+    flex: 0 0 auto;
+    font-weight: bold;
+}
+
+.okassen-import .okassen-target-row input {
+    flex: 1;
+    font-family: var(--font-mono, monospace);
+}
+
+/* Сообщение об ошибке/успехе внутри окна */
+.okassen-import .okassen-message {
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.okassen-import .okassen-message.error {
+    border-color: var(--color-level-error, #b30000);
+    background: rgba(179, 0, 0, 0.1);
+    color: var(--color-level-error, #b30000);
+}
+
+.okassen-import .okassen-message.success {
+    border-color: var(--color-level-success, #1c7a1c);
+    background: rgba(28, 122, 28, 0.1);
+    color: var(--color-level-success, #1c7a1c);
+}
+
+/* Кнопки */
+.okassen-import .okassen-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.okassen-import .okassen-buttons button {
+    flex: 1;
+    white-space: nowrap;
+}
+
+/* Второй ряд кнопок-инструментов — чуть приглушён */
+.okassen-import .okassen-buttons-tools {
+    margin-top: -4px;
+}
+
+.okassen-import .okassen-buttons-tools button {
+    font-size: var(--font-size-12, 12px);
+    opacity: 0.9;
+}
+
+/* Список истории импорта */
+.okassen-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.okassen-history-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.okassen-history-row .okassen-history-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.okassen-history-row .okassen-history-info strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.okassen-history-row .okassen-history-info span {
+    font-size: var(--font-size-11, 11px);
+    opacity: 0.7;
+}
+
+.okassen-history-row button {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+}
+
+/* Diff в диалоге дублей */
+.okassen-diff ul {
+    max-height: 240px;
+    overflow-y: auto;
+    margin: 4px 0;
+    font-size: var(--font-size-12, 12px);
+}
+
+.okassen-diff summary {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.okassen-diff-none {
+    opacity: 0.75;
+    font-style: italic;
+}
+
+/* Предпросмотр (сухой прогон) */
+.okassen-preview {
+    max-height: 440px;
+    overflow-y: auto;
+}
+
+.okassen-preview .okassen-preview-note {
+    opacity: 0.75;
+    font-size: var(--font-size-12, 12px);
+}
+
+.okassen-preview .okassen-preview-warnings p {
+    margin: 2px 0;
+    color: var(--color-level-warning, #c8a838);
+    font-size: var(--font-size-12, 12px);
+}
+
+.okassen-preview .okassen-preview-error {
+    color: var(--color-level-error, #e57373);
+}
+
+.okassen-preview .okassen-preview-doc ul {
+    margin: 2px 0 6px 0;
+}
+
+/* Браузер обработчиков */
+.okassen-handler-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.okassen-handler-row {
+    padding: 5px 4px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.okassen-handler-row .okassen-handler-src {
+    font-size: var(--font-size-11, 11px);
+    opacity: 0.75;
+    margin-left: 6px;
+}
+
+.okassen-handler-row .okassen-handler-missing {
+    font-size: var(--font-size-11, 11px);
+    color: var(--color-level-error, #e57373);
+    margin-left: 6px;
+}
+
+.okassen-handler-row .okassen-handler-refs {
+    font-size: var(--font-size-11, 11px);
+    opacity: 0.8;
+}
+
+/* Статус-строка под редактором: живая валидация + кнопка «Формат» */
+.okassen-import .okassen-editor-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+    margin-top: -4px;
+}
+
+.okassen-import .okassen-status-text {
+    flex: 1;
+    font-size: var(--font-size-11, 11px);
+    opacity: 0.85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.okassen-import .okassen-status-text.ok { color: var(--color-level-success, #4caf50); }
+.okassen-import .okassen-status-text.error { color: var(--color-level-error, #e57373); }
+
+/* Тултип-подсказка под статус-строкой: описание механики под кареткой */
+.okassen-import .okassen-hint-line {
+    min-height: 14px;
+    margin-top: -6px;
+    font-size: var(--font-size-11, 11px);
+    color: #6fb8ff;
+    opacity: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.okassen-import .okassen-hint-line:empty {
+    display: none;
+}
+
+.okassen-import .okassen-format-btn {
+    flex: 0 0 auto;
+    width: auto;
+    font-size: var(--font-size-11, 11px);
+    padding: 2px 10px;
+    line-height: 1.6;
+}

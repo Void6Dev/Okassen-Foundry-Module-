@@ -1,23 +1,52 @@
 {
   "id": "okassen",
   "title": "Okassen: Better JSON Integration (BJI)",
-  "description": "Импорт расширенного JSON в предметы dnd5e с Active Effects, вложениями и onUse-логикой. / Import of extended JSON into dnd5e items with Active Effects, nested items and onUse logic.",
-  "version": "0.1.0",
-  "compatibility": { "minimum": "13", "verified": "13" },
+  "description": "<p>Импорт расширенного JSON в предметы и актёров dnd5e: Active Effects, вложения, onUse и хуки жизненного цикла, overTime-механики, сниппеты, история импорта с откатом, предпросмотр, компендиумы. / Import of extended JSON into dnd5e items and actors: Active Effects, nested items, onUse and lifecycle hooks, over-time mechanics, snippets, undoable import history, dry-run preview, compendium support.</p>",
+  "version": "0.3.0",
+  "compatibility": {
+    "minimum": "13.347",
+    "verified": "14"
+  },
   "relationships": {
     "systems": [
       {
         "id": "dnd5e",
         "type": "system",
-        "compatibility": { "minimum": "4.4.0", "verified": "4.4.4" }
+        "compatibility": {
+          "minimum": "5.0.0",
+          "verified": "5.3.3"
+        }
       }
     ]
   },
-  "esmodules": ["scripts/main.js"],
-  "styles": ["styles/okassen.css"],
-  "languages": [
-    { "lang": "ru", "name": "Русский", "path": "lang/ru.json" },
-    { "lang": "en", "name": "English", "path": "lang/en.json" }
+  "esmodules": [
+    "scripts/main.js"
   ],
-  "authors": [{ "name": "Void2" }]
+  "styles": [
+    {
+      "src": "styles/okassen.css"
+    }
+  ],
+  "languages": [
+    {
+      "lang": "ru",
+      "name": "Русский",
+      "path": "lang/ru.json",
+      "flags": {}
+    },
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json",
+      "flags": {}
+    }
+  ],
+  "authors": [
+    {
+      "name": "Void2",
+      "flags": {}
+    }
+  ],
+  "url": "https://github.com/Void6Dev/Okassen-Foundry-Module-",
+  "flags": {}
 }
