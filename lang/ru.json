@@ -4,7 +4,15 @@
     "OKASSEN.import.hint": "Вставьте расширенный JSON предмета (dnd5e + необязательный блок _forge) и нажмите «Создать».",
     "OKASSEN.import.placeholder": "{ \"name\": \"...\", \"type\": \"weapon\", \"system\": { ... }, \"_forge\": { ... } }",
     "OKASSEN.import.target": "UUID актёра-цели",
-    "OKASSEN.import.targetHint": "Импорт: UUID актёра-цели (пусто — в мир; подходит и токен). Экспорт: UUID предмета + кнопка «Экспорт».",
+    "OKASSEN.import.targetHint": "UUID актёра-цели (пусто — создать в мире; подходит и UUID токена).",
+
+    "OKASSEN.tab.import": "Импорт",
+    "OKASSEN.tab.export": "Экспорт",
+    "OKASSEN.tab.tools": "Инструменты",
+    "OKASSEN.ui.source": "JSON-исходник",
+    "OKASSEN.ui.destination": "Назначение",
+    "OKASSEN.ui.advanced": "Расширенная цель",
+
     "OKASSEN.import.batchResult": "Создано предметов: {ok} из {total}.",
     "OKASSEN.import.folder": "Папка",
     "OKASSEN.import.folderRoot": "— Корень (без папки) —",
@@ -57,6 +65,11 @@
     "OKASSEN.export.needUuid": "Для экспорта вставьте UUID предмета или актёра в поле UUID (ПКМ по документу → «Копировать UUID») и нажмите «Экспорт» ещё раз.",
     "OKASSEN.export.notItem": "Документ по UUID «{uuid}» не найден или не является предметом/актёром.",
     "OKASSEN.export.done": "Экспортировано: «{name}». JSON в редакторе — можно копировать.",
+    "OKASSEN.export.tabHint": "Превратить существующий документ в JSON Окассен. Вставьте его UUID (или id папки / компендиума) и нажмите «Экспорт» — результат появится в редакторе на вкладке «Импорт».",
+    "OKASSEN.export.uuidLabel": "UUID или id компендиума",
+    "OKASSEN.export.tabDetail": "UUID предмета / актёра → один JSON-объект. UUID папки (Folder.xxxx) или id компендиума (например, world.my-items) → всё содержимое массивом.",
+    "OKASSEN.export.contextTip": "Подсказка: ПКМ по документу в сайдбаре → «Экспорт Окассен (JSON)», чтобы выгрузить его сразу в это окно.",
+    "OKASSEN.export.desc": "Превратить предмет, актёра, папку или компендиум в JSON.",
 
     "OKASSEN.dup.title": "Такой предмет уже есть",
     "OKASSEN.dup.content": "Предмет «{name}» (тип: {type}) уже существует. Что сделать?",
@@ -67,6 +80,12 @@
     "OKASSEN.guide.title": "Окассен — руководство по импорту",
     "OKASSEN.guide.pageName": "Как пользоваться",
     "OKASSEN.guide.created": "Окассен: в журналах создано руководство «{name}».",
+    "OKASSEN.guide.desc": "Открыть журнал-руководство с описанием формата и примерами.",
+
+    "OKASSEN.preview.desc": "Сухой прогон: проверить JSON и развернуть эффекты, ничего не создавая.",
+    "OKASSEN.url.desc": "Загрузить JSON по ссылке (gist / GitHub raw) в редактор.",
+    "OKASSEN.history.desc": "Журнал всех импортов из этого окна с откатом одной кнопкой.",
+    "OKASSEN.handlers.desc": "Обзор onUse-/хук-обработчиков и документов, которые на них ссылаются.",
 
     "OKASSEN.onuse.logMessage": "<p><strong>Окассен:</strong> {actor} использует предмет «{item}». (демо-обработчик onUse «log»)</p>",
     "OKASSEN.onuse.sealsMessage": "<p><strong>{item}:</strong> печать {used} из {total} активирована.{effect}</p>",

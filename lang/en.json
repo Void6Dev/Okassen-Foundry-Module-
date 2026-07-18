@@ -4,7 +4,15 @@
     "OKASSEN.import.hint": "Paste an extended item JSON (dnd5e + optional _forge block) and press \"Create\".",
     "OKASSEN.import.placeholder": "{ \"name\": \"...\", \"type\": \"weapon\", \"system\": { ... }, \"_forge\": { ... } }",
     "OKASSEN.import.target": "Target actor UUID",
-    "OKASSEN.import.targetHint": "Import: target actor UUID (empty = world; a token works too). Export: item UUID + the \"Export\" button.",
+    "OKASSEN.import.targetHint": "Target actor UUID (empty = create in the world; a token UUID works too).",
+
+    "OKASSEN.tab.import": "Import",
+    "OKASSEN.tab.export": "Export",
+    "OKASSEN.tab.tools": "Tools",
+    "OKASSEN.ui.source": "JSON Source",
+    "OKASSEN.ui.destination": "Destination",
+    "OKASSEN.ui.advanced": "Advanced target",
+
     "OKASSEN.import.batchResult": "Items created: {ok} of {total}.",
     "OKASSEN.import.folder": "Folder",
     "OKASSEN.import.folderRoot": "— Root (no folder) —",
@@ -57,6 +65,11 @@
     "OKASSEN.export.needUuid": "To export, paste an item or actor UUID into the UUID field (right-click the document → \"Copy UUID\") and press \"Export\" again.",
     "OKASSEN.export.notItem": "Document \"{uuid}\" not found or is not an item/actor.",
     "OKASSEN.export.done": "Exported \"{name}\". The JSON is in the editor — ready to copy.",
+    "OKASSEN.export.tabHint": "Turn an existing document into Okassen JSON. Paste its UUID (or a folder / compendium id) and press Export — the result lands in the editor on the Import tab.",
+    "OKASSEN.export.uuidLabel": "UUID or compendium id",
+    "OKASSEN.export.tabDetail": "Item / actor UUID → one JSON object. A Folder.xxxx UUID or a compendium id (e.g. world.my-items) → the whole set as a JSON array.",
+    "OKASSEN.export.contextTip": "Tip: right-click a document in the sidebar → \"Okassen Export (JSON)\" to export it straight into this window.",
+    "OKASSEN.export.desc": "Turn an existing item, actor, folder or compendium into JSON.",
 
     "OKASSEN.dup.title": "Item already exists",
     "OKASSEN.dup.content": "Item \"{name}\" (type: {type}) already exists. What should happen?",
@@ -67,6 +80,12 @@
     "OKASSEN.guide.title": "Okassen — Import Guide",
     "OKASSEN.guide.pageName": "How to use",
     "OKASSEN.guide.created": "Okassen: guide journal \"{name}\" created.",
+    "OKASSEN.guide.desc": "Open the in-world guide journal with format reference and examples.",
+
+    "OKASSEN.preview.desc": "Dry run: validate the JSON and expand effects without creating anything.",
+    "OKASSEN.url.desc": "Fetch JSON from a link (gist / GitHub raw) into the editor.",
+    "OKASSEN.history.desc": "Undoable log of everything imported from this window.",
+    "OKASSEN.handlers.desc": "Browse onUse / lifecycle handlers and where documents reference them.",
 
     "OKASSEN.onuse.logMessage": "<p><strong>Okassen:</strong> {actor} uses item \"{item}\". (demo onUse handler \"log\")</p>",
     "OKASSEN.onuse.sealsMessage": "<p><strong>{item}:</strong> seal {used} of {total} activated.{effect}</p>",
