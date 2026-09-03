@@ -4,7 +4,15 @@ Loader of extended JSON for Foundry VTT 13/14 + dnd5e 5.x (verified on 5.3.3; ke
 
 ## Installation
 
-Copy (or symlink) the `okassen` folder into `Data/modules/` of your Foundry installation and enable the module in your world. The folder name must be exactly `okassen` — it matches the module's `id`.
+In Foundry: **Configuration → Add-on Modules → Install Module**, paste this into the **Manifest URL** field:
+
+```
+https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/module.json
+```
+
+Then enable the module in your world. The link always resolves to the newest release, so Foundry picks up updates on its own.
+
+Manual install: copy (or symlink) the `okassen` folder into `Data/modules/` of your Foundry installation. The folder name must be exactly `okassen` — it matches the module's `id`.
 
 ## Usage
 
@@ -123,9 +131,19 @@ dnd5e с дополнительным блоком `_forge` и программ�
 
 ## Установка
 
-Скопируйте (или слинкуйте) папку `okassen` в `Data/modules/` вашей инсталляции
-Foundry и включите модуль в мире. Имя папки должно быть именно `okassen` —
-оно совпадает с `id` модуля.
+В Foundry: **Настройка → Модули → Установить модуль**, вставьте в поле
+**Manifest URL**:
+
+```
+https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/module.json
+```
+
+Затем включите модуль в мире. Ссылка всегда ведёт на свежий релиз, поэтому
+обновления Foundry подтянет сам.
+
+Вручную: скопируйте (или слинкуйте) папку `okassen` в `Data/modules/` вашей
+инсталляции Foundry. Имя папки должно быть именно `okassen` — оно совпадает
+с `id` модуля.
 
 ## Использование
 

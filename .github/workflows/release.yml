@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+      - "[0-9]+.[0-9]+.[0-9]+*"
 
 permissions:
   contents: write
@@ -14,12 +15,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Patch module.json for this tag
         run: |
           node -e '
             const fs = require("fs");
-            const tag = process.env.GITHUB_REF_NAME;         
-            const repo = process.env.GITHUB_REPOSITORY;        
+            const tag = process.env.GITHUB_REF_NAME;
+            const repo = process.env.GITHUB_REPOSITORY;
             const m = JSON.parse(fs.readFileSync("module.json", "utf8"));
             m.version = tag.replace(/^v/, "");
             m.manifest = `https://github.com/${repo}/releases/latest/download/module.json`;
@@ -27,16 +29,29 @@ jobs:
             fs.writeFileSync("module.json", JSON.stringify(m, null, 2) + "\n");
             console.log("Patched module.json:", { version: m.version, download: m.download });
           '
+
       - name: Build module.zip
         run: |
           zip -r module.zip . \
-            -x ".git/*" ".github/*" "module.zip" "_preview_harness.html"
+            -x ".git/*" ".github/*" ".claude/*" ".gitattributes" \
+               "module.zip" "_preview_harness.html"
+
+      - name: Verify package
+        run: |
+          unzip -l module.zip | grep -q " module.json$" || { echo "module.json отсутствует в корне архива"; exit 1; }
+          node -e '
+            const m = JSON.parse(require("fs").readFileSync("module.json","utf8"));
+            if (m.id !== "okassen") throw new Error("id != okassen");
+            if (!m.version || !m.download || !m.manifest) throw new Error("нет version/download/manifest");
+            console.log("OK:", m.id, m.version);
+          '
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
           files: |
             module.json
             module.zip
