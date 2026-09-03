@@ -1,17 +1,26 @@
 {
   "name": "Превращение",
-  "type": "feat",
+  "type": "spell",
   "img": "icons/magic/nature/wolf-paw-glow-large-green.webp",
   "system": {
     "description": {
-      "value": "<p>Носитель превращается в другую форму. Превращение происходит <strong>в токене на сцене</strong>: копия актёра в сайдбаре не создаётся, лист персонажа остаётся прежним.</p><p>Повторное использование возвращает исходный облик.</p>",
+      "value": "<p><strong>1 круг, преобразование</strong></p><p>Заклинатель принимает облик другого существа. Превращается <strong>токен на сцене</strong>: копия актёра в сайдбаре не создаётся, лист персонажа остаётся прежним.</p><p>В новой форме появляется предмет <em>«Вернуть облик»</em> — одно действие, чтобы вернуться обратно. Повторное использование самого заклинания (когда оно доступно) тоже возвращает исходную форму.</p>",
       "chat": "Превращение!"
     },
+    "level": 1,
+    "school": "trs",
+    "method": "spell",
+    "prepared": 1,
+    "properties": ["vocal", "somatic"],
+    "activation": { "type": "action", "value": 1 },
+    "duration": { "value": "1", "units": "hour" },
+    "range": { "units": "self" },
+    "target": { "affects": { "type": "self" } },
     "activities": {
       "okassentrnsfrm01": {
         "_id": "okassentrnsfrm01",
         "type": "utility",
-        "name": "Превратиться / вернуть форму",
+        "name": "Превратиться",
         "activation": { "type": "action" }
       }
     }
@@ -25,6 +34,7 @@
           "only": "Actor.STFZUeEhPP0j3mcs",
           "preset": "polymorph",
           "toggle": true,
+          "returnItem": true,
           "renderSheet": false
         }
       }

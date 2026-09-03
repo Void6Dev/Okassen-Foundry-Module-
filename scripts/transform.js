@@ -30,6 +30,7 @@
  *     settings: { keep: ["hp"] }, // точечные переопределения TransformationSetting
  *     toggle: true,               // повторное использование = возврат (по умолчанию да)
  *     unlink: true,               // можно ли отвязывать связанный токен (по умолчанию да)
+ *     returnItem: true,           // положить в новую форму предмет «Вернуть облик» (по умолчанию да)
  *     renderSheet: false,         // открывать лист новой формы
  *     only: "Actor.<id>"          // работает только у этого носителя (uuid/id или массив)
  *   }
@@ -165,6 +166,54 @@ async function relinkToken(token) {
 }
 
 /**
+ * Положить в новую форму предмет «Вернуть облик» — одна кнопка на листе
+ * зверя, чтобы вернуться обратно. Иначе возврат неудобен: предмет-источник
+ * (заклинание, черта) остаётся у ИСХОДНОГО актёра и в новой форме его нет,
+ * а штатная кнопка dnd5e пересоздаёт токен и требует прав ГМ.
+ *
+ * Предмет живёт в дельте токена, поэтому при возврате (восстановлении связи)
+ * исчезает сам — чистить его не нужно.
+ *
+ * @param {Actor} shaped — актёр токена уже в новой форме
+ * @param {object} cfg — конфиг превращения (кладётся во флаги предмета)
+ * @param {string} img — иконка исходного облика
+ */
+async function addReturnItem(shaped, cfg, img) {
+  const name = game.i18n.localize("OKASSEN.transform.returnItem");
+  if (shaped.items.some(i => i.getFlag(MODULE_ID, "returnItem"))) return;
+  const activityId = foundry.utils.randomID();
+  try {
+    await shaped.createEmbeddedDocuments("Item", [{
+      name,
+      type: "feat",
+      img: img || "icons/magic/nature/wolf-paw-glow-large-green.webp",
+      system: {
+        description: { value: `<p>${game.i18n.localize("OKASSEN.transform.returnItemHint")}</p>` },
+        activities: {
+          [activityId]: {
+            _id: activityId,
+            type: "utility",
+            name,
+            activation: { type: "action" }
+          }
+        }
+      },
+      flags: {
+        [MODULE_ID]: {
+          onUse: "revert",
+          returnItem: true,
+          // Конфиг нужен обработчику "revert" (renderSheet и т.п.).
+          transform: cfg
+        }
+      }
+    }]);
+  } catch (err) {
+    // Не смогли положить предмет — превращение уже состоялось, не роняем его.
+    console.warn("[okassen] transform: не удалось добавить предмет возврата:", err);
+  }
+}
+
+/**
  * Обработчик "transform": превратить носителя в актёра из конфига.
  * Контекст тот же, что у любого onUse/хук-обработчика ({ item, actor }).
  */
@@ -226,9 +275,12 @@ export async function transformHandler({ item, actor }) {
   }
 
   const name = holder?.name ?? token.name;
+  const img = holder?.img;
   await token.actor.transformInto(source, buildSettings(Setting, cfg), {
     renderSheet: cfg.renderSheet ?? false
   });
+  // Кнопка возврата прямо на листе новой формы.
+  if (cfg.returnItem !== false) await addReturnItem(token.actor, cfg, img);
   ui.notifications.info(game.i18n.format("OKASSEN.transform.done", { name, form: source.name }));
 }
 

@@ -104,6 +104,8 @@
     "OKASSEN.transform.notTransformed": "\"{name}\" is not transformed — nothing to revert.",
     "OKASSEN.transform.badPreset": "Unknown transformation preset \"{preset}\". Available: {presets}.",
     "OKASSEN.transform.done": "{name} transforms into \"{form}\" (no actor clone was created).",
+    "OKASSEN.transform.returnItem": "Return to normal form",
+    "OKASSEN.transform.returnItemHint": "Return to the original form. This item exists only while transformed and disappears with the form.",
     "OKASSEN.transform.reverted": "{name} returns to the original form.",
 
     "OKASSEN.import.pack": "Compendium",

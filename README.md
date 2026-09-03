@@ -132,6 +132,7 @@ Config (`flags.okassen.transform`; a bare string is shorthand for `target`):
 - `preset` — dnd5e preset: `polymorph` | `wildshape` | `polymorphSelf`; `settings` overrides single `TransformationSetting` fields (`keep`, `merge`, `effects`, `minimumAC`, `tempFormula`…).
 - `toggle` (default `true`) — using the item again reverts the form; `"revert"` is also available as a standalone handler id.
 - `unlink` (default `true`) — allow unlinking a linked token. With `false` a linked token is refused instead of transformed (no clone is created either way).
+- `returnItem` (default `true`) — drop a "Return to normal form" feat into the new shape, so reverting is one click on the beast's sheet (the source spell/feat stays with the original actor and is not available while transformed). The item lives in the token delta and disappears with the form.
 - `only` — uuid/id (or an array) of the actor allowed to use it; `renderSheet` — open the new form's sheet.
 
 Requirements: the bearer needs a **token on the scene** (the form lives in the token), and players need the dnd5e "Allow Polymorphing" setting. Ready-made item: [`examples/transform.json`](examples/transform.json).
@@ -309,6 +310,7 @@ OverTime. Пример: `{ "mechanic": "heal.overTime", "value": "5", "condition
 - `preset` — пресет dnd5e: `polymorph` | `wildshape` | `polymorphSelf`; `settings` точечно переопределяет поля `TransformationSetting` (`keep`, `merge`, `effects`, `minimumAC`, `tempFormula`…).
 - `toggle` (по умолчанию `true`) — повторное использование возвращает исходную форму; есть и отдельный обработчик `"revert"`.
 - `unlink` (по умолчанию `true`) — можно ли отвязывать связанный токен. При `false` связанный токен не превращается вовсе (клон не создаётся в любом случае).
+- `returnItem` (по умолчанию `true`) — положить в новую форму черту «Вернуть облик», чтобы возврат был в один клик с листа зверя (исходное заклинание/черта остаётся у исходного актёра и в форме недоступно). Предмет живёт в дельте токена и исчезает вместе с формой.
 - `only` — uuid/id (или массив) актёра, у которого предмет работает; `renderSheet` — открывать лист новой формы.
 
 Требования: у носителя должен быть **токен на сцене** (форма живёт в токене), а игрокам нужна настройка dnd5e «Разрешить игрокам превращения». Готовый предмет: [`examples/transform.json`](examples/transform.json).

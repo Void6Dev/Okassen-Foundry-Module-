@@ -104,6 +104,8 @@
     "OKASSEN.transform.notTransformed": "«{name}» не в изменённой форме — возвращать нечего.",
     "OKASSEN.transform.badPreset": "Неизвестный пресет превращения «{preset}». Доступны: {presets}.",
     "OKASSEN.transform.done": "{name} превращается в «{form}» (клон актёра не создавался).",
+    "OKASSEN.transform.returnItem": "Вернуть облик",
+    "OKASSEN.transform.returnItemHint": "Вернуться в исходную форму. Предмет существует только в изменённой форме и исчезает вместе с ней.",
     "OKASSEN.transform.reverted": "{name} возвращает исходную форму.",
 
     "OKASSEN.import.pack": "Компендиум",
