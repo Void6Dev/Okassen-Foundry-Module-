@@ -65,10 +65,12 @@ export function hasHandler(id) {
 export function runHandler(id, context, label = "") {
   const fn = HANDLERS.get(id);
   if (fn) {
+    const fail = err => console.error(`[okassen] Ошибка в обработчике "${id}"${label ? ` (${label})` : ""}:`, err);
     try {
-      fn(context);
+      // Обработчик может быть асинхронным — ловим и отложенную ошибку тоже.
+      Promise.resolve(fn(context)).catch(fail);
     } catch (err) {
-      console.error(`[okassen] Ошибка в обработчике "${id}"${label ? ` (${label})` : ""}:`, err);
+      fail(err);
     }
     return true;
   }

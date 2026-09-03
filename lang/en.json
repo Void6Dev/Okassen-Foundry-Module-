@@ -53,6 +53,7 @@
     "OKASSEN.errors.badSetValue": "Mechanic \"{mechanic}\": value \"{value}\" is not a valid key. Allowed values: {allowed}.",
     "OKASSEN.errors.targetNotActor": "The import target is not an actor.",
     "OKASSEN.errors.actorNoNested": "Actor \"{name}\": \"_forge.nested\" is not supported on actors — actor items go in the standard \"items\" array (each may have its own _forge).",
+    "OKASSEN.errors.transformNoTarget": "Item \"{name}\": the \"transform\" handler requires flags.okassen.transform.target — set the target actor uuid in _forge.extraFlags.okassen.transform.",
     "OKASSEN.errors.actorNoOnUse": "Actor \"{name}\": \"_forge.onUse\" is not supported on actors — set onUse on specific items in the \"items\" array.",
     "OKASSEN.errors.itemsNotArray": "\"items\" on \"{name}\" must be an array of items.",
 
@@ -91,6 +92,19 @@
     "OKASSEN.onuse.sealsMessage": "<p><strong>{item}:</strong> seal {used} of {total} activated.{effect}</p>",
     "OKASSEN.onuse.sealsEffectOn": " Effect \"{effect}\" enabled.",
     "OKASSEN.onuse.sealsExhausted": "<p><strong>{item}:</strong> all {total} seals are already active.</p>",
+
+    "OKASSEN.transform.noTarget": "\"{item}\": flags.okassen.transform.target is not set — nothing to transform into.",
+    "OKASSEN.transform.targetNotFound": "Transformation: actor \"{target}\" not found.",
+    "OKASSEN.transform.noToken": "Transformation: \"{name}\" has no token on the scene. The new form lives in the token — place one and try again.",
+    "OKASSEN.transform.needsDnd5e": "Transformation requires dnd5e 5.x (TransformationSetting class not found).",
+    "OKASSEN.transform.notAllowed": "Transformation is blocked by the dnd5e \"Allow Polymorphing\" setting — ask your GM to enable it.",
+    "OKASSEN.transform.linkedToken": "Token \"{name}\" is linked, and a clone-free transformation requires unlinking it. Remove \"unlink\": false from the config or unlink the token manually.",
+    "OKASSEN.transform.unlinkFailed": "Could not unlink token \"{name}\" — token owner permissions are required.",
+    "OKASSEN.transform.already": "\"{name}\" is already transformed.",
+    "OKASSEN.transform.notTransformed": "\"{name}\" is not transformed — nothing to revert.",
+    "OKASSEN.transform.badPreset": "Unknown transformation preset \"{preset}\". Available: {presets}.",
+    "OKASSEN.transform.done": "{name} transforms into \"{form}\" (no actor clone was created).",
+    "OKASSEN.transform.reverted": "{name} returns to the original form.",
 
     "OKASSEN.import.pack": "Compendium",
     "OKASSEN.import.packNone": "— Do not use (world / actor) —",

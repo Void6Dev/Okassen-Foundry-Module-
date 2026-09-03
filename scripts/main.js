@@ -15,6 +15,7 @@ import { buildForgeJson, buildFolderForgeJson, buildPackForgeJson } from "./expo
 import { migrateWorld, FORMAT_VERSION } from "./migrations.js";
 import { initOverTime } from "./overtime.js";
 import { initLifecycleHooks } from "./lifecycle.js";
+import { initTransform } from "./transform.js";
 import { analyzeDependencies, midiActive } from "./deps.js";
 import { analyzeSchema } from "./schema.js";
 import { preprocess } from "./preprocess.js";
@@ -662,6 +663,7 @@ Hooks.once("init", () => {
   // Регистрируем хуки использования предметов и подкладывания вложенных,
   // встроенный обработчик overTime (урон/лечение по ходам).
   initOnUse();
+  initTransform();
   initNestedHooks();
   initOverTime();
   initLifecycleHooks();

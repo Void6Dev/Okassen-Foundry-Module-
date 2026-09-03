@@ -2,7 +2,7 @@
   "id": "okassen",
   "title": "Okassen: Better JSON Integration (BJI)",
   "description": "<p>Импорт расширенного JSON в предметы и актёров dnd5e: Active Effects, вложения, onUse и хуки жизненного цикла, overTime-механики, сниппеты, история импорта с откатом, предпросмотр, компендиумы. / Import of extended JSON into dnd5e items and actors: Active Effects, nested items, onUse and lifecycle hooks, over-time mechanics, snippets, undoable import history, dry-run preview, compendium support.</p>",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "compatibility": {
     "minimum": "13.347",
     "verified": "14"
@@ -49,6 +49,6 @@
   ],
   "url": "https://github.com/Void6Dev/Okassen-Foundry-Module-",
   "manifest": "https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/module.json",
-  "download": "https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/download/v0.3.0/module.zip",
+  "download": "https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/download/v0.4.0/module.zip",
   "flags": {}
 }

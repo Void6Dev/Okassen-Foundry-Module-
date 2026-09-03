@@ -1,0 +1,33 @@
+{
+  "name": "Превращение",
+  "type": "feat",
+  "img": "icons/magic/nature/wolf-paw-glow-large-green.webp",
+  "system": {
+    "description": {
+      "value": "<p>Носитель превращается в другую форму. Превращение происходит <strong>в токене на сцене</strong>: копия актёра в сайдбаре не создаётся, лист персонажа остаётся прежним.</p><p>Повторное использование возвращает исходный облик.</p>",
+      "chat": "Превращение!"
+    },
+    "activities": {
+      "okassentrnsfrm01": {
+        "_id": "okassentrnsfrm01",
+        "type": "utility",
+        "name": "Превратиться / вернуть форму",
+        "activation": { "type": "action" }
+      }
+    }
+  },
+  "_forge": {
+    "onUse": "transform",
+    "extraFlags": {
+      "okassen": {
+        "transform": {
+          "target": "Actor.m11cHsUGypU1dZBs",
+          "only": "Actor.STFZUeEhPP0j3mcs",
+          "preset": "polymorph",
+          "toggle": true,
+          "renderSheet": false
+        }
+      }
+    }
+  }
+}

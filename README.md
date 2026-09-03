@@ -109,6 +109,33 @@ Honest limitations:
 - `resistance/immunity/vulnerability.add` values must be valid damage types; `proficiency.tool.add` value must be a tool id.
 - **onUse, lifecycle hooks and built-in overTime require the module to stay enabled.** Effects and nested items keep working without it.
 
+## Built-in handlers
+
+`"log"`, `"seals"`, **`"transform"` / `"revert"`**.
+
+**`transform` — turn the bearer into another actor with no sidebar clone and no macro.** Plain dnd5e polymorph creates a new `Name (Form)` actor whenever the token is linked; the handler unlinks the token first, so the new form is written into the token's `ActorDelta` (the only clone-free branch of `Actor5e#transformInto`, verified against dnd5e 5.3.3). The world actor and its sheet stay untouched; reverting just re-links the token, so a player can do it without GM token-creation rights.
+
+```json
+"_forge": {
+  "onUse": "transform",
+  "extraFlags": { "okassen": { "transform": {
+    "target": "Actor.m11cHsUGypU1dZBs",
+    "preset": "polymorph",
+    "toggle": true
+  } } }
+}
+```
+
+Config (`flags.okassen.transform`; a bare string is shorthand for `target`):
+
+- `target` — uuid of the actor to become (world or compendium). Required.
+- `preset` — dnd5e preset: `polymorph` | `wildshape` | `polymorphSelf`; `settings` overrides single `TransformationSetting` fields (`keep`, `merge`, `effects`, `minimumAC`, `tempFormula`…).
+- `toggle` (default `true`) — using the item again reverts the form; `"revert"` is also available as a standalone handler id.
+- `unlink` (default `true`) — allow unlinking a linked token. With `false` a linked token is refused instead of transformed (no clone is created either way).
+- `only` — uuid/id (or an array) of the actor allowed to use it; `renderSheet` — open the new form's sheet.
+
+Requirements: the bearer needs a **token on the scene** (the form lives in the token), and players need the dnd5e "Allow Polymorphing" setting. Ready-made item: [`examples/transform.json`](examples/transform.json).
+
 ## Custom handlers
 
 ```js
@@ -258,6 +285,33 @@ OverTime. Пример: `{ "mechanic": "heal.overTime", "value": "5", "condition
   значение `proficiency.tool.add` — id инструмента.
 - **onUse, хуки жизненного цикла и встроенный overTime требуют включённого
   модуля.** Эффекты и вложения работают и без него.
+
+## Встроенные обработчики
+
+`"log"`, `"seals"`, **`"transform"` / `"revert"`**.
+
+**`transform` — превращает носителя в другого актёра без клона в сайдбаре и без макроса.** Штатное превращение dnd5e для связанного токена создаёт актёра «Имя (Форма)» — клона; обработчик сначала отвязывает токен, поэтому новая форма пишется в `ActorDelta` самого токена (единственная ветка `Actor5e#transformInto` без клона, сверено с dnd5e 5.3.3). Мировой актёр и его лист не меняются, а возврат — это просто восстановление связи токена, поэтому он доступен игроку без прав на создание токенов.
+
+```json
+"_forge": {
+  "onUse": "transform",
+  "extraFlags": { "okassen": { "transform": {
+    "target": "Actor.m11cHsUGypU1dZBs",
+    "preset": "polymorph",
+    "toggle": true
+  } } }
+}
+```
+
+Конфиг (`flags.okassen.transform`; строка вместо объекта = только `target`):
+
+- `target` — uuid актёра, в которого превращаемся (мир или компендиум). Обязателен.
+- `preset` — пресет dnd5e: `polymorph` | `wildshape` | `polymorphSelf`; `settings` точечно переопределяет поля `TransformationSetting` (`keep`, `merge`, `effects`, `minimumAC`, `tempFormula`…).
+- `toggle` (по умолчанию `true`) — повторное использование возвращает исходную форму; есть и отдельный обработчик `"revert"`.
+- `unlink` (по умолчанию `true`) — можно ли отвязывать связанный токен. При `false` связанный токен не превращается вовсе (клон не создаётся в любом случае).
+- `only` — uuid/id (или массив) актёра, у которого предмет работает; `renderSheet` — открывать лист новой формы.
+
+Требования: у носителя должен быть **токен на сцене** (форма живёт в токене), а игрокам нужна настройка dnd5e «Разрешить игрокам превращения». Готовый предмет: [`examples/transform.json`](examples/transform.json).
 
 ## Свои обработчики
 

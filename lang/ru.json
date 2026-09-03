@@ -53,6 +53,7 @@
     "OKASSEN.errors.badSetValue": "Механика «{mechanic}»: значение «{value}» не является допустимым ключом. Допустимые значения: {allowed}.",
     "OKASSEN.errors.targetNotActor": "Цель импорта не является актёром.",
     "OKASSEN.errors.actorNoNested": "У актёра «{name}» блок «_forge.nested» не поддерживается — предметы актёра задаются стандартным массивом «items» (каждый может иметь свой _forge).",
+    "OKASSEN.errors.transformNoTarget": "Предмет «{name}»: обработчик «transform» требует flags.okassen.transform.target — укажите uuid актёра-цели в _forge.extraFlags.okassen.transform.",
     "OKASSEN.errors.actorNoOnUse": "У актёра «{name}» блок «_forge.onUse» не поддерживается — onUse задаётся у конкретных предметов в массиве «items».",
     "OKASSEN.errors.itemsNotArray": "«items» у «{name}» должен быть массивом предметов.",
 
@@ -91,6 +92,19 @@
     "OKASSEN.onuse.sealsMessage": "<p><strong>{item}:</strong> печать {used} из {total} активирована.{effect}</p>",
     "OKASSEN.onuse.sealsEffectOn": " Эффект «{effect}» включён.",
     "OKASSEN.onuse.sealsExhausted": "<p><strong>{item}:</strong> все {total} печатей уже активированы.</p>",
+
+    "OKASSEN.transform.noTarget": "«{item}»: не задан flags.okassen.transform.target — не во что превращаться.",
+    "OKASSEN.transform.targetNotFound": "Превращение: актёр «{target}» не найден.",
+    "OKASSEN.transform.noToken": "Превращение: у «{name}» нет токена на сцене. Форма живёт в токене — поставьте токен и повторите.",
+    "OKASSEN.transform.needsDnd5e": "Превращение требует dnd5e 5.x (класс TransformationSetting не найден).",
+    "OKASSEN.transform.notAllowed": "Превращение запрещено настройкой dnd5e «Разрешить игрокам превращения» — попросите ведущего включить её.",
+    "OKASSEN.transform.linkedToken": "Токен «{name}» связан с актёром, а превращение без клона требует отвязки. Уберите \"unlink\": false из конфига или отвяжите токен вручную.",
+    "OKASSEN.transform.unlinkFailed": "Не удалось отвязать токен «{name}» — нужны права владельца токена.",
+    "OKASSEN.transform.already": "«{name}» уже в изменённой форме.",
+    "OKASSEN.transform.notTransformed": "«{name}» не в изменённой форме — возвращать нечего.",
+    "OKASSEN.transform.badPreset": "Неизвестный пресет превращения «{preset}». Доступны: {presets}.",
+    "OKASSEN.transform.done": "{name} превращается в «{form}» (клон актёра не создавался).",
+    "OKASSEN.transform.reverted": "{name} возвращает исходную форму.",
 
     "OKASSEN.import.pack": "Компендиум",
     "OKASSEN.import.packNone": "— Не использовать (мир / актёр) —",
