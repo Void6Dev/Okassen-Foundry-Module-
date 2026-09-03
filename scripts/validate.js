@@ -31,6 +31,25 @@ function validateForgeHooks(forge, name, allowed) {
 }
 
 /**
+ * Проверить конфиг встроенного обработчика "transform": без цели он не
+ * сработает, а узнать об этом лучше при импорте, чем при использовании.
+ * Конфиг живёт во флагах (_forge.extraFlags.okassen.transform) — строкой-uuid
+ * или объектом с полем target.
+ *
+ * @param {object} forge — блок _forge
+ * @param {string} name — имя документа (для текста ошибки)
+ */
+function validateTransform(forge, name) {
+  const ids = [forge.onUse, ...Object.keys(ITEM_HOOKS).map(k => forge[k])];
+  if (!ids.includes("transform")) return;
+  const cfg = forge.extraFlags?.okassen?.transform;
+  const target = typeof cfg === "string" ? cfg : cfg?.target;
+  if (typeof target !== "string" || !target) {
+    throw new Error(game.i18n.format("OKASSEN.errors.transformNoTarget", { name }));
+  }
+}
+
+/**
  * Проверить блок эффектов _forge (общая часть для предметов и актёров).
  * @param {object} forge — блок _forge
  * @param {string} name — имя документа (для текстов ошибок)
@@ -95,6 +114,7 @@ function validateActor(raw) {
       throw new Error(game.i18n.format("OKASSEN.errors.actorNoOnUse", { name: raw.name }));
     }
     validateForgeHooks(forge, raw.name, ACTOR_HOOKS);
+    validateTransform(forge, raw.name);
     validateForgeEffects(forge, raw.name);
   }
 
@@ -160,6 +180,9 @@ export function validate(raw, depth = 0, { allowActor = true } = {}) {
 
   // --- Хуки жизненного цикла (onEquip, onTurnStart и др.) ---
   validateForgeHooks(forge, raw.name, ITEM_HOOKS);
+
+  // --- Встроенный обработчик "transform": нужна цель ---
+  validateTransform(forge, raw.name);
 
   // --- Вложенные предметы: рекурсивная проверка с ограничением глубины ---
   if (forge.nested != null && !Array.isArray(forge.nested)) {
