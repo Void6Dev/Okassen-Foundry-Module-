@@ -15,6 +15,8 @@ import { analyzeSchema } from "./schema.js";
 
 import { escapeHtml } from "./util.js";
 import { ITEM_HOOKS } from "./lifecycle.js";
+import { findExistingLocal, sourceIdOf } from "./sync.js";
+import { isActorType } from "./util.js";
 
 const esc = s => escapeHtml(s);
 
@@ -80,6 +82,31 @@ function hooksHtml(forge) {
   return `<p><strong>${game.i18n.localize("OKASSEN.preview.hooks")}:</strong> ${parts.join(", ")}</p>`;
 }
 
+/**
+ * Что случится с документом при импорте: он совпадёт с существующим (и тогда
+ * сработает политика дублей) или будет создан заново. Компендиумы здесь не
+ * проверяются — их индекс грузится асинхронно, а предпросмотр строится одним
+ * проходом; для мира и сайдбара ответ точный.
+ */
+function fateHtml(raw) {
+  try {
+    const documentName = isActorType(raw?.type) ? "Actor" : "Item";
+    const existing = findExistingLocal(
+      { name: raw?.name, type: raw?.type },
+      { sourceId: sourceIdOf(raw), documentName }
+    );
+    if (!existing) {
+      return `<p class="okassen-preview-fate okassen-fate-new">${game.i18n.localize("OKASSEN.preview.willCreate")}</p>`;
+    }
+    return `<p class="okassen-preview-fate okassen-fate-existing">${game.i18n.format("OKASSEN.preview.willMatch", {
+      name: esc(existing.name)
+    })}</p>`;
+  } catch (err) {
+    console.warn("[okassen] Предпросмотр: не удалось определить судьбу документа:", err);
+    return "";
+  }
+}
+
 /** Сводка по одному документу (рекурсивно для вложений и предметов актёра). */
 function documentHtml(raw, depth = 0) {
   const name = esc(raw?.name ?? "?");
@@ -109,6 +136,7 @@ function documentHtml(raw, depth = 0) {
   return `<div class="okassen-preview-doc" style="margin-left:${depth * 14}px">
     <p><strong>${name}</strong> <code>${type}</code></p>
     ${validity}
+    ${depth === 0 ? fateHtml(raw) : ""}
     ${sourceId}
     ${effectsHtml(forge.effects)}
     ${hooksHtml(forge)}

@@ -20,6 +20,9 @@
         <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="handlers">
             <i class="fa-solid fa-code"></i> {{localize "OKASSEN.tabs.handlers"}}
         </button>
+        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="sources">
+            <i class="fa-solid fa-code-compare"></i> {{localize "OKASSEN.tabs.sources"}}
+        </button>
         <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="guide">
             <i class="fa-solid fa-book-open"></i> {{localize "OKASSEN.tabs.guide"}}
         </button>
@@ -75,13 +78,26 @@
                     <button type="button" data-action="example">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "OKASSEN.import.example"}}
                     </button>
+                    <button type="button" data-action="pickFile">
+                        <i class="fa-solid fa-folder-open"></i> {{localize "OKASSEN.file.button"}}
+                    </button>
                     <button type="button" data-action="fromUrl">
                         <i class="fa-solid fa-link"></i> {{localize "OKASSEN.url.button"}}
+                    </button>
+                    <button type="button" data-action="download">
+                        <i class="fa-solid fa-download"></i> {{localize "OKASSEN.file.download"}}
+                    </button>
+                    <button type="button" data-action="copy">
+                        <i class="fa-solid fa-copy"></i> {{localize "OKASSEN.file.copy"}}
                     </button>
                     <button type="button" data-action="clear">
                         <i class="fa-solid fa-eraser"></i> {{localize "OKASSEN.import.clear"}}
                     </button>
                 </footer>
+
+                {{!-- Скрытый выбор файлов: открывается кнопкой «Файл…».
+                      multiple — несколько JSON сливаются в пакетный массив. --}}
+                <input type="file" class="okassen-file" accept=".json,application/json" multiple hidden>
             </div>
 
             {{!-- Правая колонка: карточка «Назначение» --}}
@@ -184,6 +200,22 @@
             </button>
         </div>
         <div class="okassen-handlers-content okassen-tab-scroll"></div>
+    </section>
+
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Исходники»: расхождения документов с их JSON.        --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="sources">
+        <p class="okassen-hint">{{localize "OKASSEN.sources.hint"}}</p>
+        <div class="okassen-tab-toolbar">
+            <button type="button" data-action="sourcesRefresh">
+                <i class="fa-solid fa-rotate"></i> {{localize "OKASSEN.history.refresh"}}
+            </button>
+            <button type="button" data-action="rebuildAll">
+                <i class="fa-solid fa-arrows-rotate"></i> {{localize "OKASSEN.sources.rebuildAll"}}
+            </button>
+        </div>
+        <div class="okassen-sources-content okassen-tab-scroll"></div>
     </section>
 
     {{!-- ============================================================ --}}

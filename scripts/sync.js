@@ -76,7 +76,19 @@ async function findInPack(pack, sourceId) {
  */
 export async function findExisting(data, { sourceId = null, target = null, pack = null, documentName = "Item" } = {}) {
   if (pack) return findInPack(pack, sourceId);
+  return findExistingLocal(data, { sourceId, target, documentName });
+}
 
+/**
+ * Синхронная версия поиска — по миру и по предметам актёра, без компендиумов
+ * (их индекс грузится асинхронно). Нужна предпросмотру, который строит HTML
+ * одним проходом и ждать не может.
+ *
+ * @param {object} data — данные документа
+ * @param {object} [opts] — sourceId, target, documentName
+ * @returns {Item|Actor|null}
+ */
+export function findExistingLocal(data, { sourceId = null, target = null, documentName = "Item" } = {}) {
   const collection = documentName === "Actor"
     ? game.actors
     : (target ? target.items : game.items);

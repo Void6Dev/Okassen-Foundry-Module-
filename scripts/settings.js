@@ -19,7 +19,8 @@ export const DEFAULTS = {
   nestedDepth: 2,            // максимальная глубина _forge.nested
   schemaWarnings: true,      // предупреждать о неизвестных полях system
   liveLint: true,            // живая проверка _forge в редакторе
-  autoGuide: true            // создавать журнал-руководство при первом запуске
+  autoGuide: true,           // создавать журнал-руководство при первом запуске
+  gmRelay: true              // выполнять действия игроков от имени ведущего
 };
 
 /**
@@ -89,6 +90,15 @@ export function registerSettings() {
     config: true,
     type: Boolean,
     default: DEFAULTS.liveLint
+  });
+
+  game.settings.register(MODULE_ID, "gmRelay", {
+    name: "OKASSEN.cfg.gmRelay.name",
+    hint: "OKASSEN.cfg.gmRelay.hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: DEFAULTS.gmRelay
   });
 
   game.settings.register(MODULE_ID, "autoGuide", {

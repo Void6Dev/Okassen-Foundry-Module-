@@ -20,7 +20,8 @@ import { hasHandler } from "./onuse.js";
 import { stampFormatVersion } from "./migrations.js";
 import { applyForgeHookFlags, warnUnregisteredHooks, ACTOR_HOOKS } from "./lifecycle.js";
 import { recordCreated, recordReplaced } from "./history.js";
-import { escapeHtml, isActorType } from "./util.js";
+import { isActorType } from "./util.js";
+import { buildDiffHtml } from "./diff.js";
 import { getSetting } from "./settings.js";
 import { sourceIdOf, stampSourceId, findExisting, updateForgeDocument } from "./sync.js";
 
@@ -223,73 +224,6 @@ function resolvePack(pack, documentName) {
   if (p.documentName !== documentName) return null;
   if (p.locked) throw new Error(game.i18n.format("OKASSEN.errors.packLocked", { pack }));
   return pack;
-}
-
-/** Короткое строковое представление значения для diff-списка. */
-function shortValue(v) {
-  let s;
-  try {
-    s = typeof v === "string" ? v : JSON.stringify(v);
-  } catch {
-    s = String(v);
-  }
-  if (s === undefined) s = "—";
-  if (s.length > 48) s = s.slice(0, 45) + "…";
-  return escapeHtml(s);
-}
-
-/**
- * HTML-diff между существующим предметом и тем, во что превратится новый JSON.
- * Новый предмет прогоняется через модель данных (new Item(data)), чтобы
- * сравнивать ПОЛНЫЕ данные с полными — иначе разреженный входной JSON дал бы
- * ложные «удаления» на каждом незаполненном поле схемы.
- *
- * @param {Item|Actor} existing — существующий документ
- * @param {object} data — данные создаваемого документа (уже без _forge)
- * @returns {string} — HTML (<details> со списком отличий) или ""
- */
-function buildDiffHtml(existing, data) {
-  const MAX_ROWS = 24;
-  try {
-    const pick = src => foundry.utils.flattenObject({
-      name: src.name, img: src.img, system: src.system ?? {}
-    });
-    const oldFlat = pick(existing.toObject());
-    // Полные данные нового: модель заполнит умолчания и вычистит мусор.
-    const cls = existing.documentName === "Actor" ? Actor : Item;
-    const newDoc = new cls.implementation(foundry.utils.deepClone(data));
-    const newFlat = pick(newDoc.toObject());
-
-    const rows = [];
-    for (const k of [...new Set([...Object.keys(oldFlat), ...Object.keys(newFlat)])].sort()) {
-      const a = JSON.stringify(oldFlat[k]);
-      const b = JSON.stringify(newFlat[k]);
-      if (a === b) continue;
-      rows.push(`<li><code>${escapeHtml(k)}</code>: ${shortValue(oldFlat[k])} → ${shortValue(newFlat[k])}</li>`);
-    }
-
-    // Эффекты сравниваем по именам (детально их покажет предпросмотр).
-    const oldFx = existing.effects.map(e => e.name).sort().join(", ");
-    const newFx = (data.effects ?? []).map(e => e.name).sort().join(", ");
-    if (oldFx !== newFx) {
-      rows.push(`<li><code>effects</code>: [${shortValue(oldFx)}] → [${shortValue(newFx)}]</li>`);
-    }
-
-    if (!rows.length) {
-      return `<p class="okassen-diff-none">${game.i18n.localize("OKASSEN.dup.noDiff")}</p>`;
-    }
-    const shown = rows.slice(0, MAX_ROWS).join("");
-    const more = rows.length > MAX_ROWS
-      ? `<li>… ${game.i18n.format("OKASSEN.dup.moreDiff", { count: rows.length - MAX_ROWS })}</li>`
-      : "";
-    return `<details class="okassen-diff" open>
-      <summary>${game.i18n.format("OKASSEN.dup.diffSummary", { count: rows.length })}</summary>
-      <ul>${shown}${more}</ul>
-    </details>`;
-  } catch (err) {
-    console.warn("[okassen] Не удалось построить diff для диалога дублей:", err);
-    return "";
-  }
 }
 
 /**
