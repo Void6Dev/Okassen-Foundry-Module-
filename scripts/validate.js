@@ -8,9 +8,23 @@
 import { resolveMechanic, validateChangeValue } from "./mechanics.js";
 import { ITEM_HOOKS, ACTOR_HOOKS } from "./lifecycle.js";
 import { itemTypes, actorTypes } from "./util.js";
+import { getSetting } from "./settings.js";
 
-/** Максимальная глубина вложенности _forge.nested (см. nested.js) */
-const MAX_NESTED_DEPTH = 2;
+/** Максимальная глубина вложенности _forge.nested (настройка мира, см. nested.js) */
+function maxNestedDepth() {
+  return Math.max(1, Number(getSetting("nestedDepth")) || 2);
+}
+
+/**
+ * Проверить стабильный идентификатор _forge.sourceId: по нему повторный
+ * импорт находит документ, поэтому пустая строка или число — ошибка.
+ */
+function validateSourceId(forge, name) {
+  if (forge.sourceId == null) return;
+  if (typeof forge.sourceId !== "string" || !forge.sourceId.trim()) {
+    throw new Error(game.i18n.format("OKASSEN.errors.badSourceId", { name }));
+  }
+}
 
 /**
  * Проверить хуки жизненного цикла в блоке _forge.
@@ -115,6 +129,7 @@ function validateActor(raw) {
     }
     validateForgeHooks(forge, raw.name, ACTOR_HOOKS);
     validateTransform(forge, raw.name);
+    validateSourceId(forge, raw.name);
     validateForgeEffects(forge, raw.name);
   }
 
@@ -173,6 +188,9 @@ export function validate(raw, depth = 0, { allowActor = true } = {}) {
   // --- Эффекты ---
   validateForgeEffects(forge, raw.name);
 
+  // --- Стабильный идентификатор для повторного импорта ---
+  validateSourceId(forge, raw.name);
+
   // --- onUse: строка-идентификатор или null ---
   if (forge.onUse != null && typeof forge.onUse !== "string") {
     throw new Error(game.i18n.format("OKASSEN.errors.badOnUse", { name: raw.name }));
@@ -188,10 +206,10 @@ export function validate(raw, depth = 0, { allowActor = true } = {}) {
   if (forge.nested != null && !Array.isArray(forge.nested)) {
     throw new Error(game.i18n.format("OKASSEN.errors.nestedNotArray", { name: raw.name }));
   }
-  if (depth < MAX_NESTED_DEPTH) {
+  if (depth < maxNestedDepth()) {
     for (const def of forge.nested ?? []) validate(def, depth + 1, { allowActor: false });
   }
-  // Глубже MAX_NESTED_DEPTH не валидируем: nested.js всё равно проигнорирует
+  // Глубже настроенной глубины не валидируем: nested.js всё равно проигнорирует
   // такие уровни с предупреждением.
 
   return true;

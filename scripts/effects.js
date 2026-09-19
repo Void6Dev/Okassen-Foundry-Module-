@@ -193,6 +193,10 @@ export function buildEffects(forgeEffects = []) {
     if (overTimeSpecs.length) {
       foundry.utils.setProperty(data, "flags.okassen.overTime", overTimeSpecs);
     }
+    // Штамп «эффект собран модулем». По нему повторный импорт в режиме
+    // «Обновить на месте» понимает, какие эффекты можно пересобрать, а какие
+    // ведущий добавил руками и трогать их нельзя (см. sync.js).
+    foundry.utils.setProperty(data, "flags.okassen.managed", true);
     return data;
   });
 }

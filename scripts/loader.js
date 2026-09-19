@@ -21,8 +21,23 @@ import { stampFormatVersion } from "./migrations.js";
 import { applyForgeHookFlags, warnUnregisteredHooks, ACTOR_HOOKS } from "./lifecycle.js";
 import { recordCreated, recordReplaced } from "./history.js";
 import { escapeHtml, isActorType } from "./util.js";
+import { getSetting } from "./settings.js";
+import { sourceIdOf, stampSourceId, findExisting, updateForgeDocument } from "./sync.js";
 
 const MODULE_ID = "okassen";
+
+/**
+ * Чем закончился ПОСЛЕДНИЙ импорт: "created" | "updated" | "replaced".
+ * Нужно окну импорта, чтобы сообщение в окне совпадало с тем, что реально
+ * произошло («создан» против «обновлён»); возвращать вместо документа объект
+ * с результатом — значило бы сломать публичное API.
+ */
+let lastOutcome = "created";
+
+/** Чем закончился последний вызов createForgeItem/createForgeActor. */
+export function lastImportOutcome() {
+  return lastOutcome;
+}
 
 /**
  * Создать предмет из расширенного JSON.
@@ -36,9 +51,13 @@ const MODULE_ID = "okassen";
  *   (выбирается в окне импорта; применяется только к папкам типа Item)
  * @param {string|null} [options.pack=null] — id компендиума-цели
  *   (например "world.my-items"); игнорируется при указанном target
- * @param {"keep"|"ask"} [options.onDuplicate="keep"] — что делать, если предмет
- *   с тем же именем и типом уже существует: "keep" — молча создать копию,
- *   "ask" — спросить пользователя (заменить / копия / отмена)
+ * @param {"keep"|"ask"|"auto"|"update"|"replace"} [options.onDuplicate="keep"] —
+ *   что делать, если такой документ уже есть (совпал _forge.sourceId либо
+ *   имя + тип): "keep" — молча создать копию; "update" — обновить найденный
+ *   на месте (uuid, папка и права сохраняются); "replace" — удалить старый и
+ *   создать новый; "ask" — спросить пользователя, если настройка мира не
+ *   задаёт ответ заранее; "auto" — взять ответ из настройки, не спрашивая
+ *   (пакетный импорт)
  * @returns {Promise<Item|null>} — созданный предмет; null, если пользователь отменил
  * @throws {Error} — прокидывает ошибку дальше (окно импорта покажет её в себе),
  *   предварительно залогировав и показав ui.notifications.error
@@ -57,9 +76,11 @@ export async function createForgeItem(rawJson, { target = null, silent = false, 
     delete data._forge; // _forge НЕ должен протечь в системные данные предмета
 
     // 3. Флаги: extraFlags автора + служебные флаги модуля.
+    const sourceId = sourceIdOf(rawJson);
     data.flags = foundry.utils.mergeObject(data.flags ?? {}, forge.extraFlags ?? {});
     foundry.utils.setProperty(data.flags, `${MODULE_ID}.source`, source);
     stampFormatVersion(data.flags);
+    stampSourceId(data.flags, sourceId); // якорь для повторного импорта
     if (forge.onUse) foundry.utils.setProperty(data.flags, `${MODULE_ID}.onUse`, forge.onUse);
     applyForgeHookFlags(data.flags, forge); // onEquip/onCreate/onTurnStart и др.
 
@@ -69,21 +90,43 @@ export async function createForgeItem(rawJson, { target = null, silent = false, 
     //     эффект на цель активности при использовании / провале спасброска.
     linkActivityEffects(data, forge.effects ?? []);
 
-    // 5. Дубликаты: если такой предмет уже есть и режим "ask" — спрашиваем.
-    //    В компендиуме дубликаты не ищем (пак — библиотека, копии там норма).
-    const collection = pack ? null : (target ? target.items : game.items);
-    const existing = collection?.find(i => i.name === data.name && i.type === data.type);
-    if (existing && onDuplicate === "ask") {
-      const choice = await askDuplicate(existing, data);
+    // 5. Дубликаты. Ищем по _forge.sourceId (переживает переименование), иначе
+    //    по имени + типу. В компендиуме — только по sourceId: совпадение имён
+    //    в библиотеке это норма.
+    const mode = resolveDuplicateMode(onDuplicate);
+    const existing = mode === "keep"
+      ? null
+      : await findExisting(data, { sourceId, target, pack, documentName: "Item" });
+
+    let choice = mode;
+    if (existing && mode === "ask") {
+      choice = await askDuplicate(existing, data);
       if (!choice || choice === "cancel") return null; // отмена — ничего не создаём
-      if (choice === "replace") {
-        // Новый предмет займёт место старого (и его папку, если своя не выбрана).
-        if (!target && !folder && existing.folder) folder = existing.folder.id;
-        recordReplaced(existing); // снапшот в историю — откат восстановит
-        await existing.delete();
-      }
-      // "keep" — просто создаём копию рядом.
     }
+
+    // 5а. «Обновить на месте»: документ остаётся тем же (uuid, папка, права,
+    //     позиция в инвентаре), меняется только содержимое — см. sync.js.
+    if (existing && choice === "update") {
+      const updated = await updateForgeDocument(existing, data, forge);
+      lastOutcome = "updated";
+      warnHandlers(updated, forge);
+      if (!silent) {
+        ui.notifications.info(game.i18n.format("OKASSEN.notify.updated", {
+          name: updated.name,
+          place: target ? target.name : game.i18n.localize("OKASSEN.notify.world")
+        }));
+      }
+      return updated;
+    }
+
+    if (existing && choice === "replace") {
+      // Новый предмет займёт место старого (и его папку, если своя не выбрана).
+      if (!target && !folder && existing.folder) folder = existing.folder.id;
+      recordReplaced(existing); // снапшот в историю — откат восстановит
+      await existing.delete();
+    }
+    // "keep" — просто создаём копию рядом.
+    lastOutcome = existing && choice === "replace" ? "replaced" : "created";
 
     // 6. Папка (только для мировых предметов): выбранная в окне — приоритетнее
     //    той, что могла приехать в JSON; битые id папок из чужих миров чистим.
@@ -112,15 +155,9 @@ export async function createForgeItem(rawJson, { target = null, silent = false, 
     // 8. Вложенные предметы. Ошибки внутри не роняют импорт (см. nested.js).
     await attachNested(item, forge.nested ?? []);
 
-    // 9. onUse: флаг уже стоит; честно предупреждаем, если обработчика (пока) нет.
-    if (forge.onUse && !hasHandler(forge.onUse)) {
-      console.warn(`[okassen] onUse-обработчик "${forge.onUse}" не зарегистрирован — предмет создан, но логика при использовании не сработает, пока обработчик не появится`);
-      ui.notifications.warn(game.i18n.format("OKASSEN.notify.onUseUnregistered", {
-        handler: forge.onUse,
-        item: item.name
-      }));
-    }
-    warnUnregisteredHooks(item); // то же для хуков жизненного цикла
+    // 9. onUse и хуки: флаги уже стоят; честно предупреждаем, если
+    //    обработчика (пока) нет.
+    warnHandlers(item, forge);
 
     // 10. Успех.
     if (!silent) {
@@ -138,6 +175,36 @@ export async function createForgeItem(rawJson, { target = null, silent = false, 
     ui.notifications.error(game.i18n.format("OKASSEN.notify.error", { message: err.message }));
     throw err;
   }
+}
+
+/**
+ * Во что превращается запрошенный режим дублей.
+ *  - "ask"  — спросить, если настройка мира не решает за пользователя;
+ *  - "auto" — молча взять ответ из настройки (пакетный импорт ничего не
+ *             спрашивает: 50 диалогов подряд — не помощь);
+ *  - остальное передаётся как есть (вызов из API главнее настройки).
+ */
+function resolveDuplicateMode(onDuplicate) {
+  const configured = getSetting("defaultDuplicate");
+  if (onDuplicate === "ask") return configured;
+  if (onDuplicate === "auto") return configured === "ask" ? "keep" : configured;
+  return onDuplicate ?? "keep";
+}
+
+/**
+ * Предупредить о незарегистрированных обработчиках (onUse и хуки).
+ * Документ уже создан/обновлён — логика просто не сработает, пока
+ * обработчик не появится (api.registerHandler или макрос okassen:<id>).
+ */
+function warnHandlers(doc, forge) {
+  if (forge.onUse && !hasHandler(forge.onUse)) {
+    console.warn(`[okassen] onUse-обработчик "${forge.onUse}" не зарегистрирован — документ создан, но логика при использовании не сработает, пока обработчик не появится`);
+    ui.notifications.warn(game.i18n.format("OKASSEN.notify.onUseUnregistered", {
+      handler: forge.onUse,
+      item: doc.name
+    }));
+  }
+  warnUnregisteredHooks(doc);
 }
 
 /**
@@ -177,8 +244,8 @@ function shortValue(v) {
  * сравнивать ПОЛНЫЕ данные с полными — иначе разреженный входной JSON дал бы
  * ложные «удаления» на каждом незаполненном поле схемы.
  *
- * @param {Item} existing — существующий предмет
- * @param {object} data — данные создаваемого предмета (уже без _forge)
+ * @param {Item|Actor} existing — существующий документ
+ * @param {object} data — данные создаваемого документа (уже без _forge)
  * @returns {string} — HTML (<details> со списком отличий) или ""
  */
 function buildDiffHtml(existing, data) {
@@ -189,7 +256,8 @@ function buildDiffHtml(existing, data) {
     });
     const oldFlat = pick(existing.toObject());
     // Полные данные нового: модель заполнит умолчания и вычистит мусор.
-    const newDoc = new Item.implementation(foundry.utils.deepClone(data));
+    const cls = existing.documentName === "Actor" ? Actor : Item;
+    const newDoc = new cls.implementation(foundry.utils.deepClone(data));
     const newFlat = pick(newDoc.toObject());
 
     const rows = [];
@@ -226,21 +294,28 @@ function buildDiffHtml(existing, data) {
 
 /**
  * Спросить пользователя, что делать с дубликатом. Показывает diff:
- * что именно изменится, если выбрать «Заменить».
- * @param {Item} existing — уже существующий предмет
- * @param {object} data — данные нового предмета
- * @returns {Promise<"replace"|"keep"|"cancel"|null>}
+ * что именно изменится в документе.
+ *
+ * «Обновить» идёт первым и выбран по умолчанию: при итеративной работе это
+ * нужный ответ в подавляющем большинстве случаев — документ остаётся тем же
+ * (uuid, папка, права, место в инвентаре), меняется только содержимое.
+ *
+ * @param {Item|Actor} existing — уже существующий документ
+ * @param {object} data — данные нового документа
+ * @returns {Promise<"update"|"replace"|"keep"|"cancel"|null>}
  */
 async function askDuplicate(existing, data) {
   return foundry.applications.api.DialogV2.wait({
     window: { title: game.i18n.localize("OKASSEN.dup.title"), icon: "fa-solid fa-clone" },
-    position: { width: 480 },
+    position: { width: 520 },
     content: `<p>${game.i18n.format("OKASSEN.dup.content", { name: existing.name, type: existing.type })}</p>`
-      + buildDiffHtml(existing, data),
+      + buildDiffHtml(existing, data)
+      + `<p class="okassen-hint okassen-hint-small">${game.i18n.localize("OKASSEN.dup.updateHint")}</p>`,
     buttons: [
+      { action: "update", label: "OKASSEN.dup.update", icon: "fa-solid fa-arrows-rotate", default: true },
       { action: "replace", label: "OKASSEN.dup.replace", icon: "fa-solid fa-rotate" },
       { action: "keep", label: "OKASSEN.dup.keep", icon: "fa-solid fa-copy" },
-      { action: "cancel", label: "OKASSEN.dup.cancel", icon: "fa-solid fa-xmark", default: true }
+      { action: "cancel", label: "OKASSEN.dup.cancel", icon: "fa-solid fa-xmark" }
     ],
     rejectClose: false // закрытие окна = отмена, а не исключение
   }).catch(() => "cancel");
@@ -269,9 +344,12 @@ export function isActorJson(raw) {
  * @param {string|null} [options.folder=null] — id папки для актёра
  *   (применяется только к папкам типа Actor)
  * @param {string|null} [options.pack=null] — id компендиума актёров-цели
- * @returns {Promise<Actor>} — созданный актёр
+ * @param {"keep"|"ask"|"auto"|"update"|"replace"} [options.onDuplicate="keep"] —
+ *   как поступить с уже существующим актёром (см. createForgeItem)
+ * @returns {Promise<Actor|null>} — созданный (или обновлённый) актёр;
+ *   null, если пользователь отменил импорт в диалоге дублей
  */
-export async function createForgeActor(rawJson, { folder = null, pack = null } = {}) {
+export async function createForgeActor(rawJson, { folder = null, pack = null, onDuplicate = "keep" } = {}) {
   try {
     // 1. Валидация (validate сам распознаёт актёра по type).
     validate(rawJson);
@@ -287,11 +365,44 @@ export async function createForgeActor(rawJson, { folder = null, pack = null } =
     delete data.items;
 
     // 3. Флаги и эффекты самого актёра.
+    const sourceId = sourceIdOf(rawJson);
     data.flags = foundry.utils.mergeObject(data.flags ?? {}, forge.extraFlags ?? {});
     foundry.utils.setProperty(data.flags, `${MODULE_ID}.source`, source);
     stampFormatVersion(data.flags);
+    stampSourceId(data.flags, sourceId); // якорь для повторного импорта
     applyForgeHookFlags(data.flags, forge, ACTOR_HOOKS); // onTurnStart/onTurnEnd актёра
     data.effects = buildEffects(forge.effects ?? []);
+
+    // 3а. Дубликаты актёра: тот же выбор, что и у предметов. «Обновить»
+    //     сохраняет uuid актёра — токены на сценах не теряют связь.
+    const mode = resolveDuplicateMode(onDuplicate);
+    const existing = mode === "keep"
+      ? null
+      : await findExisting(data, { sourceId, pack, documentName: "Actor" });
+
+    let choice = mode;
+    if (existing && mode === "ask") {
+      choice = await askDuplicate(existing, data);
+      if (!choice || choice === "cancel") return null;
+    }
+
+    if (existing && choice === "update") {
+      const updated = await updateForgeDocument(existing, data, forge, {
+        importItem: createForgeItem,
+        itemDefs
+      });
+      lastOutcome = "updated";
+      warnUnregisteredHooks(updated);
+      ui.notifications.info(game.i18n.format("OKASSEN.notify.actorUpdated", { name: updated.name }));
+      return updated;
+    }
+
+    if (existing && choice === "replace") {
+      if (!folder && existing.folder) folder = existing.folder.id;
+      recordReplaced(existing);
+      await existing.delete();
+    }
+    lastOutcome = existing && choice === "replace" ? "replaced" : "created";
 
     // 4. Папка: выбранная в окне приоритетнее приехавшей в JSON; битые id чистим.
     //    В компендиуме мировые папки не действуют.
@@ -344,6 +455,6 @@ export async function createForgeActor(rawJson, { folder = null, pack = null } =
  */
 export async function importAny(parsed, { target = null, folder = null, pack = null, onDuplicate = "keep" } = {}) {
   return isActorJson(parsed)
-    ? createForgeActor(parsed, { folder, pack })
+    ? createForgeActor(parsed, { folder, pack, onDuplicate })
     : createForgeItem(parsed, { target, folder, pack, onDuplicate });
 }

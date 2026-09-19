@@ -120,10 +120,15 @@ async function buildActorForgeJson(actor) {
   if (actor.effects.size) forge.effects = exportEffects(actor.effects);
   exportHooks(actor, forge, ACTOR_HOOKS);
 
+  // Стабильный идентификатор: с ним повторный импорт этого JSON обновит
+  // именно этого актёра, даже если его переименовали (см. sync.js).
+  const actorSourceId = actor.getFlag(MODULE_ID, "sourceId");
+  if (actorSourceId) forge.sourceId = actorSourceId;
+
   // extraFlags: все флаги, кроме служебных okassen.*
   const flags = foundry.utils.deepClone(src.flags ?? {});
   if (flags[MODULE_ID]) {
-    for (const k of ["source", "nested", "parent", "onUse", "hooks", "formatVersion"]) delete flags[MODULE_ID][k];
+    for (const k of ["source", "nested", "parent", "onUse", "hooks", "formatVersion", "sourceId", "managed"]) delete flags[MODULE_ID][k];
     if (foundry.utils.isEmpty(flags[MODULE_ID])) delete flags[MODULE_ID];
   }
   if (!foundry.utils.isEmpty(flags)) forge.extraFlags = flags;
@@ -174,10 +179,14 @@ export async function buildForgeJson(item, depth = 0) {
   if (onUse) forge.onUse = onUse;
   exportHooks(item, forge, ITEM_HOOKS);
 
+  // --- Стабильный идентификатор для повторного импорта («Обновить») ---
+  const sourceId = item.getFlag(MODULE_ID, "sourceId");
+  if (sourceId) forge.sourceId = sourceId;
+
   // --- extraFlags: все флаги, кроме служебных okassen.* ---
   const flags = foundry.utils.deepClone(src.flags ?? {});
   if (flags[MODULE_ID]) {
-    for (const k of ["source", "nested", "parent", "onUse", "hooks", "formatVersion"]) delete flags[MODULE_ID][k];
+    for (const k of ["source", "nested", "parent", "onUse", "hooks", "formatVersion", "sourceId", "managed"]) delete flags[MODULE_ID][k];
     if (foundry.utils.isEmpty(flags[MODULE_ID])) delete flags[MODULE_ID];
   }
   if (!foundry.utils.isEmpty(flags)) forge.extraFlags = flags;

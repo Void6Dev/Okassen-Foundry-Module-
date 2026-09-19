@@ -14,6 +14,7 @@ import { analyzeDependencies } from "./deps.js";
 import { analyzeSchema } from "./schema.js";
 
 import { escapeHtml } from "./util.js";
+import { ITEM_HOOKS } from "./lifecycle.js";
 
 const esc = s => escapeHtml(s);
 
@@ -69,7 +70,9 @@ function effectsHtml(forgeEffects) {
 
 /** Хуки документа (_forge.onUse/onEquip/...) одной строкой. */
 function hooksHtml(forge) {
-  const keys = ["onUse", "onEquip", "onUnequip", "onCreate", "onDelete", "onTurnStart", "onTurnEnd"];
+  // Список берём из реестра хуков, чтобы новые триггеры появлялись
+  // в предпросмотре сами, без правки этого файла.
+  const keys = ["onUse", ...Object.keys(ITEM_HOOKS)];
   const parts = keys
     .filter(k => typeof forge?.[k] === "string" && forge[k])
     .map(k => `${k} → <code>${esc(forge[k])}</code>`);
@@ -97,9 +100,16 @@ function documentHtml(raw, depth = 0) {
   const items = (raw?.items ?? [])
     .map(def => documentHtml(def, depth + 1)).join("");
 
+  // sourceId виден сразу: по нему повторный импорт найдёт документ и
+  // предложит обновить его, а не создать копию.
+  const sourceId = typeof forge.sourceId === "string" && forge.sourceId
+    ? `<p class="okassen-preview-note">${game.i18n.localize("OKASSEN.preview.sourceId")}: <code>${esc(forge.sourceId)}</code></p>`
+    : "";
+
   return `<div class="okassen-preview-doc" style="margin-left:${depth * 14}px">
     <p><strong>${name}</strong> <code>${type}</code></p>
     ${validity}
+    ${sourceId}
     ${effectsHtml(forge.effects)}
     ${hooksHtml(forge)}
     ${nested ? `<div><strong>${game.i18n.localize("OKASSEN.preview.nested")}:</strong>${nested}</div>` : ""}

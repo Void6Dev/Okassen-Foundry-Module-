@@ -27,8 +27,11 @@ Window tools:
 - **From URL** — fetch JSON by a direct link (gist/GitHub raw); it is only placed into the editor.
 - **Handlers** — browser of registered onUse/hook handlers and the world documents referencing them.
 - **Export** — item/actor UUID → extended JSON in the editor. Also accepts a **folder UUID** (`Folder.xxx`) or a **pack id** (`world.my-items`) for bulk export as a JSON array.
-- **Duplicate protection with diff** — on name+type collision the dialog shows exactly which fields "Replace" would change.
+- **Repeated import** — when the document already exists (matching `_forge.sourceId`, or name and type), the dialog shows a diff and offers **Update in place** (keeps uuid, folder, permissions and inventory position — only the content changes), **Replace** (delete and re-create) or **Create a copy**. The default answer is a module setting; batch import applies it silently. Note: an update is a rebuild, not a merge — `system` is replaced wholesale, so a field missing from the JSON returns to the system default.
+- **Live `_forge` check** — under the editor: unknown mechanics and handlers, `applyTo` pointing at a missing activity, unknown statuses, dependency and schema warnings. Click "line N" to jump there.
 - Import-time checks: unknown `system` fields (dnd5e schema) and mechanics/raw keys that need inactive **midi-qol**/**DAE** produce warnings.
+
+Module settings (Configure Settings → Module Settings): duplicate handling, import-history size, nesting depth, schema warnings, live check, guide journal creation.
 
 Programmatic access: `game.modules.get("okassen").api` — `createForgeItem(json, { target, folder, pack })`, `createForgeActor`, `importAny`, `preprocess`, `analyzeDependencies`, `analyzeSchema`, `registerHandler(id, fn)`, `MECHANICS`, `buildForgeJson`, `FORMAT_VERSION`, `openImportDialog()`.
 
@@ -87,7 +90,8 @@ Programmatic access: `game.modules.get("okassen").api` — `createForgeItem(json
 - **`tint`** → icon tint color.
 - `nested[]` → nested items (own `_forge` allowed, depth ≤ 2).
 - `onUse` → handler id fired on item use.
-- **Lifecycle hooks**: `onEquip` / `onUnequip` / `onCreate` / `onDelete` / `onTurnStart` / `onTurnEnd` — same handler registry. Actors support `onTurnStart`/`onTurnEnd` in their own `_forge`.
+- **Lifecycle hooks**: `onEquip` / `onUnequip` / `onCreate` / `onDelete` / `onTurnStart` / `onTurnEnd` / `onRest` / `onDamaged` / `onHealed` / `onCombatStart` / `onCombatEnd` — same handler registry. Context carries the event details: `restType` + `rest`, `delta` + `hp` + `previousHp`, `combat`. Actors support everything except the item-only hooks (`onEquip`, `onCreate`, `onDelete`) in their own `_forge`. Turn, rest, hp and combat hooks are handled by the active GM, so they fire once rather than on every client.
+- **`sourceId`** (string) → a stable identifier of your own (`"okassen.copper-staff"`). A repeated import looks the document up by it first and only then by name+type, so renaming the document in the world does not break updating. Round-trips through export.
 - `extraFlags` → merged into the document's `flags`.
 - Created documents are stamped with `flags.okassen.formatVersion` — future module versions can migrate them.
 
@@ -111,7 +115,27 @@ Honest limitations:
 
 ## Built-in handlers
 
-`"log"`, `"seals"`, **`"transform"` / `"revert"`**.
+`"log"`, `"seals"`, **`"transform"` / `"revert"`**, plus general-purpose ones: `"chatCard"`, `"applyEffect"`, `"toggleEffect"`, `"rollTable"`, `"summon"`, `"macro"`.
+
+Each reads its config from the flag of the same name (a bare string is shorthand for the main field):
+
+| Handler | Config (`flags.okassen.<id>`) | What it does |
+| --- | --- | --- |
+| `chatCard` | `"text"` or `{ content, flavor, whisper: "gm" }` | Chat message; `{item}`, `{actor}`, `{target}` are substituted |
+| `applyEffect` | `{ effect, to: "targets"\|"self"\|"both", duration, stack }` | Applies the item's effect to the targeted tokens (or the bearer). Without `effect` — every effect with `"transfer": false`. Re-use does not stack duplicates unless `stack: true` |
+| `toggleEffect` | `{ effect }` or `{ status: "prone" }` | Toggles one of the item's effects, or a condition on the bearer |
+| `rollTable` | `{ table, roll, rollMode }` | Draws from a RollTable (uuid or name) |
+| `summon` | `{ actor, count, name, distance, disposition }` | Places tokens of another actor around the bearer (GM only) |
+| `macro` | `{ macro, args }` | Runs a macro by name/uuid; `args` arrive as variables next to `item`/`actor`/`trigger` |
+
+```json
+"_forge": {
+  "onUse": "applyEffect",
+  "extraFlags": { "okassen": { "applyEffect": { "effect": "Web Slow", "to": "targets" } } }
+}
+```
+
+Applying an effect to an actor the player does not own is refused by Foundry — the handler says so instead of failing silently.
 
 **`transform` — turn the bearer into another actor with no sidebar clone and no macro.** Plain dnd5e polymorph creates a new `Name (Form)` actor whenever the token is linked; the handler unlinks the token first, so the new form is written into the token's `ActorDelta` (the only clone-free branch of `Actor5e#transformInto`, verified against dnd5e 5.3.3). The world actor and its sheet stay untouched; reverting just re-links the token, so a player can do it without GM token-creation rights.
 
@@ -141,7 +165,9 @@ Requirements: the bearer needs a **token on the scene** (the form lives in the t
 
 ```js
 game.modules.get("okassen").api.registerHandler("my-staff", ({ item, actor, trigger }) => {
-  // your logic; trigger: "use" | "equip" | "unequip" | "create" | "delete" | "turnStart" | "turnEnd"
+  // your logic; trigger: "use" | "equip" | "unequip" | "create" | "delete"
+  //                     | "turnStart" | "turnEnd" | "rest" | "damaged" | "healed"
+  //                     | "combatStart" | "combatEnd"
 });
 ```
 
@@ -195,11 +221,24 @@ https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/mod
 - **Экспорт** — UUID предмета/актёра → расширенный JSON в редакторе. Поле
   принимает также **UUID папки** (`Folder.xxx`) и **id компендиума**
   (`world.my-items`) — массовый экспорт JSON-массивом.
-- **Защита от дублей с diff** — при совпадении имени и типа диалог показывает,
-  какие именно поля изменит «Заменить».
+- **Повторный импорт** — если документ уже есть (совпал `_forge.sourceId` либо
+  имя и тип), диалог показывает diff и предлагает **«Обновить на месте»**
+  (документ остаётся тем же: uuid, папка, права и место в инвентаре сохраняются,
+  меняется только содержимое), **«Заменить»** (удалить и создать заново) или
+  **«Создать копию»**. Ответ по умолчанию задаётся настройкой модуля; пакетный
+  импорт применяет его молча. Обновление — это пересборка, а не слияние: блок
+  `system` заменяется целиком, поэтому поле, которого нет в JSON, вернётся
+  к умолчанию системы.
+- **Живая проверка `_forge`** — под редактором: неизвестные механики и
+  обработчики, `applyTo` на несуществующую активность, неизвестные состояния,
+  предупреждения о зависимостях и схеме. Клик по «строка N» — переход к месту.
 - Проверки при импорте: неизвестные поля `system` (сверка со схемой dnd5e)
   и механики/сырые ключи, требующие неактивных **midi-qol**/**DAE**, дают
   предупреждения.
+
+Настройки модуля (**Настройка → Настройки модулей**): что делать с дубликатом,
+размер истории импорта, глубина вложений, предупреждения о схеме, живая
+проверка, создание журнала-руководства.
 
 Программный доступ: `game.modules.get("okassen").api` —
 `createForgeItem(json, { target, folder, pack })`, `createForgeActor`, `importAny`,
@@ -236,8 +275,17 @@ https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/mod
 - `nested[]` → вложенные предметы (свой `_forge`, глубина ≤ 2).
 - `onUse` → id обработчика при использовании предмета.
 - **Хуки жизненного цикла**: `onEquip` / `onUnequip` / `onCreate` / `onDelete` /
-  `onTurnStart` / `onTurnEnd` — тот же реестр обработчиков. У актёров в их
-  `_forge` поддерживаются `onTurnStart`/`onTurnEnd`.
+  `onTurnStart` / `onTurnEnd` / `onRest` / `onDamaged` / `onHealed` /
+  `onCombatStart` / `onCombatEnd` — тот же реестр обработчиков. В контексте
+  приходят подробности события: `restType` + `rest`, `delta` + `hp` +
+  `previousHp`, `combat`. У актёров в их `_forge` поддерживается всё, кроме
+  предметных хуков (`onEquip`, `onCreate`, `onDelete`). Ходовые хуки, отдых,
+  хиты и бой обрабатывает активный ведущий — событие срабатывает один раз,
+  а не у каждого клиента.
+- **`sourceId`** (строка) → собственный стабильный идентификатор
+  (`"okassen.copper-staff"`). Повторный импорт ищет документ сначала по нему
+  и только потом по имени и типу, поэтому переименование документа в мире не
+  мешает обновлению. Переживает круг «экспорт → импорт».
 - `extraFlags` → мержится во `flags` документа.
 - Созданные документы штампуются `flags.okassen.formatVersion` — будущие версии
   модуля смогут их мигрировать.
@@ -289,7 +337,30 @@ OverTime. Пример: `{ "mechanic": "heal.overTime", "value": "5", "condition
 
 ## Встроенные обработчики
 
-`"log"`, `"seals"`, **`"transform"` / `"revert"`**.
+`"log"`, `"seals"`, **`"transform"` / `"revert"`** и обработчики общего
+назначения: `"chatCard"`, `"applyEffect"`, `"toggleEffect"`, `"rollTable"`,
+`"summon"`, `"macro"`.
+
+Каждый читает конфиг из одноимённого флага (строка = краткая запись главного поля):
+
+| Обработчик | Конфиг (`flags.okassen.<id>`) | Что делает |
+| --- | --- | --- |
+| `chatCard` | `"текст"` или `{ content, flavor, whisper: "gm" }` | Сообщение в чат; подставляет `{item}`, `{actor}`, `{target}` |
+| `applyEffect` | `{ effect, to: "targets"\|"self"\|"both", duration, stack }` | Накладывает эффект предмета на выбранные цели (или на носителя). Без `effect` — все эффекты с `"transfer": false`. Повторное применение не копит дубли, если не задан `stack: true` |
+| `toggleEffect` | `{ effect }` или `{ status: "prone" }` | Переключает эффект предмета или состояние носителя |
+| `rollTable` | `{ table, roll, rollMode }` | Бросок по таблице (uuid или имя) |
+| `summon` | `{ actor, count, name, distance, disposition }` | Ставит токены другого актёра вокруг носителя (только ведущий) |
+| `macro` | `{ macro, args }` | Вызывает макрос по имени/uuid; `args` приходят переменными рядом с `item`/`actor`/`trigger` |
+
+```json
+"_forge": {
+  "onUse": "applyEffect",
+  "extraFlags": { "okassen": { "applyEffect": { "effect": "Паутина", "to": "targets" } } }
+}
+```
+
+Наложить эффект на чужого актёра Foundry игроку не даст — обработчик честно
+сообщает об этом, а не молчит.
 
 **`transform` — превращает носителя в другого актёра без клона в сайдбаре и без макроса.** Штатное превращение dnd5e для связанного токена создаёт актёра «Имя (Форма)» — клона; обработчик сначала отвязывает токен, поэтому новая форма пишется в `ActorDelta` самого токена (единственная ветка `Actor5e#transformInto` без клона, сверено с dnd5e 5.3.3). Мировой актёр и его лист не меняются, а возврат — это просто восстановление связи токена, поэтому он доступен игроку без прав на создание токенов.
 
@@ -319,7 +390,9 @@ OverTime. Пример: `{ "mechanic": "heal.overTime", "value": "5", "condition
 
 ```js
 game.modules.get("okassen").api.registerHandler("my-staff", ({ item, actor, trigger }) => {
-  // ваша логика; trigger: "use" | "equip" | "unequip" | "create" | "delete" | "turnStart" | "turnEnd"
+  // ваша логика; trigger: "use" | "equip" | "unequip" | "create" | "delete"
+  //                       | "turnStart" | "turnEnd" | "rest" | "damaged" | "healed"
+  //                       | "combatStart" | "combatEnd"
 });
 ```
 

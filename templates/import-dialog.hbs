@@ -59,6 +59,11 @@
                 {{!-- Тултип-подсказка: описание механики под кареткой --}}
                 <div class="okassen-hint-line"></div>
 
+                {{!-- Живая проверка _forge: механики, обработчики, applyTo.
+                      Наполняется из main.js (#renderLint); клик по «строка N»
+                      ставит каретку в нужное место редактора. --}}
+                <div class="okassen-lint" hidden></div>
+
                 {{!-- Сообщение об ошибке/успехе — прямо в окне, не в консоли --}}
                 <div class="okassen-message" hidden></div>
 
@@ -197,6 +202,11 @@
     {{!-- Вкладка «Настройки»: версия, зависимости, диагностика.        --}}
     {{!-- ============================================================ --}}
     <section class="okassen-tab" data-tab="settings">
+        <div class="okassen-tab-toolbar">
+            <button type="button" data-action="openConfig" class="okassen-btn-primary">
+                <i class="fa-solid fa-sliders"></i> {{localize "OKASSEN.settings.open"}}
+            </button>
+        </div>
         <div class="okassen-settings-content okassen-tab-scroll"></div>
     </section>
 
