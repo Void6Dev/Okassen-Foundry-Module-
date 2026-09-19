@@ -5,7 +5,7 @@
  * окно импорта (ApplicationV2 + Handlebars) и публичное API модуля.
  */
 
-import { createForgeItem, createForgeActor, importAny } from "./loader.js";
+import { createForgeItem, createForgeActor, importAny, lastImportOutcome } from "./loader.js";
 import { initOnUse, registerHandler, HANDLERS } from "./onuse.js";
 import { initNestedHooks } from "./nested.js";
 import { MECHANICS, resolveMechanic } from "./mechanics.js";
@@ -14,7 +14,7 @@ import { initJsonEditor } from "./editor.js";
 import { buildForgeJson, buildFolderForgeJson, buildPackForgeJson } from "./export.js";
 import { migrateWorld, FORMAT_VERSION } from "./migrations.js";
 import { initOverTime } from "./overtime.js";
-import { initLifecycleHooks } from "./lifecycle.js";
+import { initLifecycleHooks, ITEM_HOOKS } from "./lifecycle.js";
 import { initTransform } from "./transform.js";
 import { analyzeDependencies, midiActive } from "./deps.js";
 import { analyzeSchema } from "./schema.js";
@@ -22,6 +22,9 @@ import { preprocess } from "./preprocess.js";
 import { registerHistorySetting, beginRecord, commitRecord, rollbackImport, buildHistoryHtml } from "./history.js";
 import { buildPreviewHtml } from "./preview.js";
 import { escapeHtml, itemTypes, actorTypes } from "./util.js";
+import { registerSettings, getSetting } from "./settings.js";
+import { initBuiltinHandlers } from "./handlers.js";
+import { lintForge, findLine } from "./lint.js";
 
 const MODULE_ID = "okassen";
 
@@ -121,10 +124,8 @@ function handlerCompletions() {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/** _forge-ключи, значение которых — id обработчика. */
-const HANDLER_KEYS = new Set(
-  ["onUse", "onEquip", "onUnequip", "onCreate", "onDelete", "onTurnStart", "onTurnEnd"]
-);
+/** _forge-ключи, значение которых — id обработчика (onUse + все хуки). */
+const HANDLER_KEYS = new Set(["onUse", ...Object.keys(ITEM_HOOKS)]);
 
 /**
  * Резолвер автодополнения для редактора: по ключу, значение которого
@@ -272,7 +273,8 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       preview: OkassenImportDialog.#onPreview,
       fromUrl: OkassenImportDialog.#onFromUrl,
       historyRefresh: OkassenImportDialog.#onHistoryRefresh,
-      handlersRefresh: OkassenImportDialog.#onHandlersRefresh
+      handlersRefresh: OkassenImportDialog.#onHandlersRefresh,
+      openConfig: OkassenImportDialog.#onOpenConfig
     }
   };
 
@@ -313,6 +315,9 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
    *  окно живёт одним рендером, вкладки переключаются классами. */
   #activeTab = "import";
 
+  /** Таймер отложенной проверки _forge (см. #renderLint). */
+  #lintTimer = null;
+
   /** После рендера — оживляем редактор и наполняем статичные вкладки. */
   _onRender(context, options) {
     super._onRender(context, options);
@@ -325,6 +330,17 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         hintEl: this.element.querySelector(".okassen-hint-line")
       }
     );
+
+    // Живая проверка _forge: с задержкой, чтобы не считать на каждую букву.
+    const textarea = this.element.querySelector(".okassen-json");
+    textarea?.addEventListener("input", () => {
+      clearTimeout(this.#lintTimer);
+      this.#lintTimer = setTimeout(() => this.#renderLint(), 350);
+    });
+    this.element.querySelector(".okassen-lint")?.addEventListener("click", ev => {
+      const el = ev.target.closest("[data-line]");
+      if (el) this.#jumpToLine(Number(el.dataset.line));
+    });
 
     // Руководство — статично, наполняем один раз при рендере.
     const guideBox = this.element.querySelector(".okassen-guide-content");
@@ -379,6 +395,73 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     else if (tab === "settings") this.#renderSettings();
   }
 
+  /**
+   * Живая проверка _forge под редактором: механики, обработчики, applyTo,
+   * состояния, зависимости и неизвестные поля system — списком, с прыжком
+   * к нужной строке по клику. Синтаксис JSON остаётся за статус-строкой.
+   */
+  #renderLint() {
+    const box = this.element.querySelector(".okassen-lint");
+    if (!box) return;
+    const raw = this.element.querySelector(".okassen-json")?.value ?? "";
+
+    if (!getSetting("liveLint") || !raw.trim()) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = preprocess(JSON.parse(raw));
+    } catch {
+      box.hidden = true; // битый JSON — про него уже сказала статус-строка
+      return;
+    }
+
+    let issues;
+    try {
+      issues = lintForge(parsed);
+    } catch (err) {
+      console.error("[okassen] Ошибка проверки _forge:", err);
+      box.hidden = true;
+      return;
+    }
+
+    box.hidden = false;
+    if (!issues.length) {
+      box.innerHTML = `<p class="okassen-lint-ok">✔ ${game.i18n.localize("OKASSEN.lint.clean")}</p>`;
+      return;
+    }
+
+    const errors = issues.filter(i => i.level === "error").length;
+    const rows = issues.map(issue => {
+      const line = findLine(raw, issue.needle);
+      const where = line ? `<span class="okassen-lint-line" data-line="${line}">${game.i18n.format("OKASSEN.lint.line", { line })}</span>` : "";
+      const icon = issue.level === "error" ? "✖" : "⚠";
+      return `<li class="okassen-lint-${issue.level}">${icon} ${escapeHtml(issue.message)} ${where}</li>`;
+    }).join("");
+
+    box.innerHTML = `<details class="okassen-lint-details" open>
+      <summary>${game.i18n.format("OKASSEN.lint.summary", { errors, warnings: issues.length - errors })}</summary>
+      <ul>${rows}</ul>
+    </details>`;
+  }
+
+  /** Поставить каретку на строку редактора и прокрутить к ней. */
+  #jumpToLine(line) {
+    const textarea = this.element.querySelector(".okassen-json");
+    if (!textarea) return;
+    const lines = textarea.value.split("\n");
+    if (line < 1 || line > lines.length) return;
+    const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+    textarea.focus();
+    textarea.setSelectionRange(start, start + lines[line - 1].length);
+    // Прокрутка: строка примерно посередине окна редактора.
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 16;
+    textarea.scrollTop = Math.max(0, (line - 4) * lineHeight);
+  }
+
   /** Предпросмотр: сухой прогон JSON из редактора → HTML-сводка во вкладке. */
   #renderPreview() {
     const box = this.element.querySelector(".okassen-preview-content");
@@ -422,6 +505,9 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     const historyCount = game.settings.get(MODULE_ID, "importHistory")?.length ?? 0;
 
     const row = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
+    const onOff = v => v ? L("OKASSEN.settings.on") : L("OKASSEN.settings.off");
+    const dupMode = L(`OKASSEN.cfg.defaultDuplicate.${getSetting("defaultDuplicate")}`);
+
     box.innerHTML = `
       <table class="okassen-settings-table">
         ${row(L("OKASSEN.settings.version"), escapeHtml(mod?.version ?? "?"))}
@@ -432,6 +518,16 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         ${row("DAE", dae ? yes : no)}
         ${row(L("OKASSEN.settings.historyCount"), String(historyCount))}
       </table>
+
+      <h4 class="okassen-settings-head">${L("OKASSEN.settings.current")}</h4>
+      <table class="okassen-settings-table">
+        ${row(L("OKASSEN.cfg.defaultDuplicate.name"), escapeHtml(dupMode))}
+        ${row(L("OKASSEN.cfg.historyLimit.name"), String(getSetting("historyLimit")))}
+        ${row(L("OKASSEN.cfg.nestedDepth.name"), String(getSetting("nestedDepth")))}
+        ${row(L("OKASSEN.cfg.schemaWarnings.name"), onOff(getSetting("schemaWarnings")))}
+        ${row(L("OKASSEN.cfg.liveLint.name"), onOff(getSetting("liveLint")))}
+        ${row(L("OKASSEN.cfg.autoGuide.name"), onOff(getSetting("autoGuide")))}
+      </table>
       <p class="okassen-hint okassen-hint-small">${L("OKASSEN.settings.note")}</p>`;
   }
 
@@ -439,7 +535,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   #setJson(text) {
     const textarea = this.element.querySelector(".okassen-json");
     textarea.value = text;
-    textarea.dispatchEvent(new Event("input"));
+    textarea.dispatchEvent(new Event("input")); // подсветка + отложенная проверка
   }
 
   /**
@@ -508,9 +604,13 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
 
-    // 3. Анализ зависимостей (midi-qol/DAE) и сверка system со схемой dnd5e.
-    //    Предупреждения, не ошибки — импорт продолжается.
-    const depWarnings = [...analyzeDependencies(parsed), ...analyzeSchema(parsed)];
+    // 3. Анализ зависимостей (midi-qol/DAE) и — если настройка это разрешает —
+    //    сверка system со схемой dnd5e. Предупреждения, не ошибки: импорт
+    //    продолжается.
+    const depWarnings = [
+      ...analyzeDependencies(parsed),
+      ...(getSetting("schemaWarnings") ? analyzeSchema(parsed) : [])
+    ];
 
     // 4. Создание. Массив = пакетный импорт: ошибка в одном предмете
     //    не прерывает остальные, в конце — сводка.
@@ -529,8 +629,10 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         const failed = [];
         for (const [i, entry] of parsed.entries()) {
           try {
-            const doc = await importAny(entry, { target, folder, pack });
-            ok.push(doc.name);
+            // "auto" — ответ из настройки мира, без диалога на каждый
+            // элемент пачки (50 вопросов подряд — не помощь).
+            const doc = await importAny(entry, { target, folder, pack, onDuplicate: "auto" });
+            if (doc) ok.push(doc.name);
           } catch (err) {
             failed.push(`#${i + 1} (${entry?.name ?? "?"}): ${err.message}`);
           }
@@ -558,12 +660,15 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
           this.#showMessage(game.i18n.localize("OKASSEN.import.cancelled"), "info");
           return;
         }
+        // Текст сообщения — по тому, что реально произошло: документ мог
+        // быть обновлён на месте, а не создан заново.
+        const updated = lastImportOutcome() === "updated";
+        const key = doc instanceof Actor
+          ? (updated ? "OKASSEN.import.actorUpdated" : "OKASSEN.import.actorSuccess")
+          : (updated ? "OKASSEN.import.updated" : "OKASSEN.import.success");
         this.#showMessage(
           OkassenImportDialog.#withWarnings(
-            game.i18n.format(
-              doc instanceof Actor ? "OKASSEN.import.actorSuccess" : "OKASSEN.import.success",
-              { name: doc.name }
-            ),
+            game.i18n.format(key, { name: doc.name }),
             depWarnings
           ),
           "success"
@@ -580,6 +685,19 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Кнопка «Обновить» на вкладке «История»: перечитать журнал импортов. */
   static #onHistoryRefresh(_event, _target) {
     this.#renderHistory();
+  }
+
+  /**
+   * Кнопка «Настройки модуля»: открыть штатное окно настроек Foundry на
+   * вкладке модуля (менять значения удобнее там, где это делают всегда).
+   */
+  static #onOpenConfig(_event, _target) {
+    try {
+      game.settings.sheet.render({ force: true });
+    } catch (err) {
+      console.warn("[okassen] Не удалось открыть окно настроек:", err);
+      ui.notifications.warn(game.i18n.localize("OKASSEN.settings.openFailed"));
+    }
   }
 
   /** Кнопка «Обновить» на вкладке «Обработчики»: пересобрать список. */
@@ -743,9 +861,14 @@ async function openExportDialog(doc) {
 /* ------------------------------------------------------------------ */
 
 Hooks.once("init", () => {
+  // Настройки регистрируем ПЕРВЫМИ: их читают остальные подсистемы
+  // (политика дублей, глубина вложений, лимит истории).
+  registerSettings();
+
   // Регистрируем хуки использования предметов и подкладывания вложенных,
   // встроенный обработчик overTime (урон/лечение по ходам).
   initOnUse();
+  initBuiltinHandlers();
   initTransform();
   initNestedHooks();
   initOverTime();
@@ -788,8 +911,11 @@ Hooks.once("ready", () => {
     };
   }
 
-  // Автосоздание журнала-руководства при первом запуске (только ведущий).
-  ensureGuideJournal().catch(err => console.error("[okassen] Не удалось создать журнал-руководство:", err));
+  // Автосоздание журнала-руководства при первом запуске (только ведущий
+  // и только если настройка это разрешает).
+  if (getSetting("autoGuide")) {
+    ensureGuideJournal().catch(err => console.error("[okassen] Не удалось создать журнал-руководство:", err));
+  }
 
   // Миграция контента, созданного старыми версиями формата (только ведущий).
   migrateWorld().catch(err => console.error("[okassen] Ошибка миграции:", err));

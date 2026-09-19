@@ -7,9 +7,15 @@
  *   "onCreate":    "id"  — предмет создан (в мире или на актёре);
  *   "onDelete":    "id"  — предмет удалён;
  *   "onTurnStart": "id"  — начало хода носителя в бою;
- *   "onTurnEnd":   "id"  — конец хода носителя в бою.
+ *   "onTurnEnd":   "id"  — конец хода носителя в бою;
+ *   "onRest":      "id"  — носитель завершил отдых (контекст: restType, rest);
+ *   "onDamaged":   "id"  — носителю уменьшили хиты (контекст: delta, hp);
+ *   "onHealed":    "id"  — носителю восстановили хиты (контекст: delta, hp);
+ *   "onCombatStart": "id" — начался бой с участием носителя;
+ *   "onCombatEnd":   "id" — бой с участием носителя завершён.
  *
- * У актёров поддерживаются только onTurnStart / onTurnEnd (_forge актёра).
+ * У актёров поддерживается всё, кроме предметных хуков (equip/create/delete):
+ * ходовые, отдых, изменение хитов и бой — см. ACTOR_HOOKS.
  *
  * id — тот же реестр, что у onUse: api.registerHandler("id", fn) или
  * скрипт-макрос с именем "okassen:<id>". Контекст обработчика:
@@ -30,13 +36,23 @@ export const ITEM_HOOKS = {
   onCreate: "create",
   onDelete: "delete",
   onTurnStart: "turnStart",
-  onTurnEnd: "turnEnd"
+  onTurnEnd: "turnEnd",
+  onRest: "rest",
+  onDamaged: "damaged",
+  onHealed: "healed",
+  onCombatStart: "combatStart",
+  onCombatEnd: "combatEnd"
 };
 
-/** То же для актёров: только ходовые хуки. */
+/** То же для актёров: всё, кроме хуков самого предмета (equip/create/delete). */
 export const ACTOR_HOOKS = {
   onTurnStart: "turnStart",
-  onTurnEnd: "turnEnd"
+  onTurnEnd: "turnEnd",
+  onRest: "rest",
+  onDamaged: "damaged",
+  onHealed: "healed",
+  onCombatStart: "combatStart",
+  onCombatEnd: "combatEnd"
 };
 
 /**
@@ -85,12 +101,19 @@ function fire(doc, hookKey, context) {
   }
 }
 
-/** Ходовые хуки актёра и всех его предметов (начало/конец хода). */
-function fireTurn(actor, hookKey, combat) {
+/**
+ * Запустить хук у самого актёра и у КАЖДОГО его предмета.
+ * Так «носитель» — это и актёр (его _forge), и любой предмет в инвентаре.
+ *
+ * @param {Actor|null} actor
+ * @param {string} hookKey — ключ во flags.okassen.hooks
+ * @param {object} [extra] — дополнительные поля контекста (combat, rest, delta…)
+ */
+function fireForActor(actor, hookKey, extra = {}) {
   if (!actor) return;
-  fire(actor, hookKey, { item: null, actor, combat });
+  fire(actor, hookKey, { item: null, actor, ...extra });
   for (const item of actor.items) {
-    fire(item, hookKey, { item, actor, combat });
+    fire(item, hookKey, { item, actor, ...extra });
   }
 }
 
@@ -140,11 +163,73 @@ export function initLifecycleHooks() {
       const priorActor = combat.combatants.get(prior?.combatantId)?.actor ?? null;
       const currentActor = combat.combatants.get(current?.combatantId)?.actor ?? null;
       if (priorActor && prior?.combatantId !== current?.combatantId) {
-        fireTurn(priorActor, "turnEnd", combat);
+        fireForActor(priorActor, "turnEnd", { combat });
       }
-      fireTurn(currentActor, "turnStart", combat);
+      fireForActor(currentActor, "turnStart", { combat });
     } catch (err) {
       console.error("[okassen] Ошибка ходовых хуков:", err);
+    }
+  });
+
+  // --- Отдых (dnd5e): короткий и длинный ------------------------------
+  // Хук системы: dnd5e.restCompleted(actor, result). Тип отдыха в 4.x/5.x
+  // лежит в result.type ("short"/"long"); у старых сборок — result.longRest.
+  // // verified against dnd5e 5.3.3
+  Hooks.on("dnd5e.restCompleted", (actor, result) => {
+    try {
+      if (!game.users.activeGM?.isSelf) return;
+      const restType = result?.type ?? (result?.longRest ? "long" : "short");
+      fireForActor(actor, "rest", { rest: result, restType });
+    } catch (err) {
+      console.error("[okassen] Ошибка хука onRest:", err);
+    }
+  });
+
+  // --- Изменение хитов: onDamaged / onHealed --------------------------
+  // Прежнее значение забираем в preUpdateActor: в updateActor актёр уже
+  // обновлён, и дельту по нему не вычислить.
+  Hooks.on("preUpdateActor", (actor, changed, options) => {
+    try {
+      const next = foundry.utils.getProperty(changed, "system.attributes.hp.value");
+      if (next === undefined) return;
+      options[MODULE_ID] = { ...(options[MODULE_ID] ?? {}), prevHp: actor.system?.attributes?.hp?.value ?? null };
+    } catch (err) {
+      console.error("[okassen] Ошибка подготовки хуков onDamaged/onHealed:", err);
+    }
+  });
+
+  Hooks.on("updateActor", (actor, changed, options) => {
+    try {
+      // Событие приходит всем клиентам — реагирует только активный ведущий.
+      if (!game.users.activeGM?.isSelf) return;
+      const prev = options?.[MODULE_ID]?.prevHp;
+      const next = foundry.utils.getProperty(changed, "system.attributes.hp.value");
+      if (prev == null || next === undefined) return;
+      const delta = next - prev;
+      if (!delta) return;
+      const hookKey = delta < 0 ? "damaged" : "healed";
+      fireForActor(actor, hookKey, { delta: Math.abs(delta), hp: next, previousHp: prev });
+    } catch (err) {
+      console.error("[okassen] Ошибка хуков onDamaged/onHealed:", err);
+    }
+  });
+
+  // --- Бой: начало и конец -------------------------------------------
+  Hooks.on("combatStart", combat => {
+    try {
+      if (!game.users.activeGM?.isSelf) return;
+      for (const combatant of combat.combatants) fireForActor(combatant.actor, "combatStart", { combat });
+    } catch (err) {
+      console.error("[okassen] Ошибка хука onCombatStart:", err);
+    }
+  });
+
+  Hooks.on("deleteCombat", combat => {
+    try {
+      if (!game.users.activeGM?.isSelf) return;
+      for (const combatant of combat.combatants) fireForActor(combatant.actor, "combatEnd", { combat });
+    } catch (err) {
+      console.error("[okassen] Ошибка хука onCombatEnd:", err);
     }
   });
 }

@@ -11,9 +11,9 @@
  *     (перетаскиванием), его вложенные предметы автоматически копируются
  *     на того же актёра.
  *
- * Глубина рекурсии ограничена MAX_DEPTH = 2: вложенные могут иметь свои
- * _forge.effects и даже свои _forge.nested, но третий уровень вложенности
- * игнорируется с предупреждением.
+ * Глубина рекурсии ограничена настройкой «Глубина вложений» (по умолчанию 2):
+ * вложенные могут иметь свои _forge.effects и даже свои _forge.nested, но
+ * уровни глубже лимита игнорируются с предупреждением.
  *
  * Ошибка в одном вложении НЕ роняет весь импорт — каждый ребёнок обёрнут в try/catch.
  */
@@ -22,9 +22,14 @@ import { buildEffects, linkActivityEffects } from "./effects.js";
 import { stampFormatVersion } from "./migrations.js";
 import { applyForgeHookFlags } from "./lifecycle.js";
 import { recordCreated } from "./history.js";
+import { getSetting } from "./settings.js";
 
 const MODULE_ID = "okassen";
-const MAX_DEPTH = 2;
+
+/** Максимальная глубина вложенности (настройка мира «Глубина вложений»). */
+function maxDepth() {
+  return Math.max(1, Number(getSetting("nestedDepth")) || 2);
+}
 
 /**
  * Создать вложенные предметы для родителя и связать их uuid'ами.
@@ -37,9 +42,10 @@ const MAX_DEPTH = 2;
 export async function attachNested(parentItem, nestedDefs = [], depth = 1) {
   if (!Array.isArray(nestedDefs) || !nestedDefs.length) return [];
 
-  // Ограничение глубины: третий уровень и глубже — игнорируем с предупреждением.
-  if (depth > MAX_DEPTH) {
-    console.warn(`[okassen] _forge.nested глубже ${MAX_DEPTH} уровней игнорируется (предмет "${parentItem.name}")`);
+  // Ограничение глубины: уровни глубже настроенного — игнорируем с предупреждением.
+  const limit = maxDepth();
+  if (depth > limit) {
+    console.warn(`[okassen] _forge.nested глубже ${limit} уровней игнорируется (предмет "${parentItem.name}")`);
     ui.notifications.warn(game.i18n.format("OKASSEN.notify.nestedTooDeep", { name: parentItem.name }));
     return [];
   }
