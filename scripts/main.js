@@ -285,7 +285,12 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     // Обработчики на data-action (клик по кнопке), НЕ submit формы —
     // так нет конфликтов с поведением <form>.
     actions: {
-      tab: OkassenImportDialog.#onTab,
+      // Имя действия — okassenTab, а НЕ tab: ApplicationV2 в Foundry v14
+      // обрабатывает "tab" сам (switch в #onClickAction вызывает _onClickTab
+      // раньше, чем смотрит в options.actions), поэтому обработчик модуля
+      // просто не вызывался — работала только вкладка, открытая по умолчанию.
+      // // verified against Foundry v14 build 365
+      okassenTab: OkassenImportDialog.#onTab,
       create: OkassenImportDialog.#onCreate,
       clear: OkassenImportDialog.#onClear,
       example: OkassenImportDialog.#onExample,

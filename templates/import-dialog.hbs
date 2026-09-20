@@ -1,32 +1,35 @@
 <div class="okassen-import-body okassen-tabbed">
 
     {{!-- ============================================================ --}}
-    {{!-- Навигация по вкладкам. Переключение — action "tab" (main.js),  --}}
+    {{!-- Навигация по вкладкам. Действие называется okassenTab, а не tab: --}}
+    {{!-- имя "tab" зарезервировано ядром Foundry v14 (ApplicationV2 ловит   --}}
+    {{!-- его своим switch до обработчиков приложения), и наш обработчик     --}}
+    {{!-- тогда не вызывается вовсе. // verified against Foundry v14 b365    --}}
     {{!-- все секции присутствуют в DOM, скрытые погашены классом.       --}}
     {{!-- ============================================================ --}}
     <nav class="okassen-tabs" aria-label="Okassen">
-        <button type="button" class="okassen-tab-btn active" data-action="tab" data-tab="import">
+        <button type="button" class="okassen-tab-btn active" data-action="okassenTab" data-tab="import">
             <i class="fa-solid fa-file-import"></i> {{localize "OKASSEN.tabs.import"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="export">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="export">
             <i class="fa-solid fa-file-export"></i> {{localize "OKASSEN.tabs.export"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="preview">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="preview">
             <i class="fa-solid fa-eye"></i> {{localize "OKASSEN.tabs.preview"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="history">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="history">
             <i class="fa-solid fa-clock-rotate-left"></i> {{localize "OKASSEN.tabs.history"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="handlers">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="handlers">
             <i class="fa-solid fa-code"></i> {{localize "OKASSEN.tabs.handlers"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="sources">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="sources">
             <i class="fa-solid fa-code-compare"></i> {{localize "OKASSEN.tabs.sources"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="guide">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="guide">
             <i class="fa-solid fa-book-open"></i> {{localize "OKASSEN.tabs.guide"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="settings">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="settings">
             <i class="fa-solid fa-gear"></i> {{localize "OKASSEN.tabs.settings"}}
         </button>
     </nav>
