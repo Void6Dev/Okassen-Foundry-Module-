@@ -110,9 +110,16 @@ export function installFoundryStubs({ settings = {}, items = [], actors = [], mi
   };
 
   globalThis.CONFIG = {
-    Item: { dataModels: { weapon: {}, consumable: {}, feat: {}, equipment: {}, base: {} } },
-    Actor: { dataModels: { npc: {}, character: {}, base: {} } },
-    statusEffects: [{ id: "prone" }, { id: "poisoned" }, { id: "frightened" }],
+    // Типы — как в dnd5e 5.x: из них модуль строит список допустимых
+    // значений "type" при валидации.
+    Item: {
+      dataModels: {
+        weapon: {}, equipment: {}, consumable: {}, tool: {}, loot: {}, container: {},
+        spell: {}, feat: {}, background: {}, class: {}, subclass: {}, race: {}, base: {}
+      }
+    },
+    Actor: { dataModels: { npc: {}, character: {}, group: {}, vehicle: {}, base: {} } },
+    statusEffects: [{ id: "prone" }, { id: "poisoned" }, { id: "frightened" }, { id: "restrained" }],
     DND5E: {
       abilities: { str: { label: "Strength" }, dex: { label: "Dexterity" } },
       skills: { acr: { label: "Acrobatics" } },

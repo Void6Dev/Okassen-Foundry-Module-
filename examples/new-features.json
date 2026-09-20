@@ -1,0 +1,141 @@
+[
+  {
+    "name": "Свиток вестей",
+    "type": "consumable",
+    "img": "icons/sundries/scrolls/scroll-runed-brown-purple.webp",
+    "system": {
+      "description": {
+        "value": "<p>Демонстрация обработчика <strong>chatCard</strong>: при использовании пишет в чат строку с подстановками {item} и {actor}.</p>"
+      },
+      "type": { "value": "scroll" },
+      "quantity": 1,
+      "activities": {
+        "okassendemoscrll": {
+          "_id": "okassendemoscrll",
+          "type": "utility",
+          "name": "Прочитать",
+          "activation": { "type": "action" }
+        }
+      }
+    },
+    "_forge": {
+      "sourceId": "okassen.demo.scroll",
+      "onUse": "chatCard",
+      "extraFlags": {
+        "okassen": {
+          "chatCard": "<p><strong>{actor}</strong> разворачивает «{item}» — вести приходят сами собой.</p>"
+        }
+      }
+    }
+  },
+
+  {
+    "name": "Сеть ловчего",
+    "type": "weapon",
+    "img": "icons/weapons/thrown/net-weighted.webp",
+    "system": {
+      "description": {
+        "value": "<p>Демонстрация обработчика <strong>applyEffect</strong>: наложит эффект «Опутан» на выбранные цели (наведитесь на токен клавишей T), а если целей нет — на носителя.</p>"
+      },
+      "type": { "value": "simpleR" },
+      "activities": {
+        "okassendemonet01": {
+          "_id": "okassendemonet01",
+          "type": "attack",
+          "name": "Набросить",
+          "activation": { "type": "action" }
+        }
+      }
+    },
+    "_forge": {
+      "sourceId": "okassen.demo.net",
+      "onUse": "applyEffect",
+      "effects": [
+        {
+          "id": "okassen-demo-net-effect",
+          "label": "Опутан",
+          "icon": "icons/magic/nature/vines-thorned-curled-glow-teal.webp",
+          "transfer": false,
+          "duration": { "rounds": 2 },
+          "statuses": ["restrained"],
+          "changes": [
+            { "mechanic": "ac.bonus", "value": -2 }
+          ]
+        }
+      ],
+      "extraFlags": {
+        "okassen": {
+          "applyEffect": { "effect": "Опутан", "to": "targets" }
+        }
+      }
+    }
+  },
+
+  {
+    "name": "Амулет бодрости",
+    "type": "equipment",
+    "img": "icons/equipment/neck/amulet-symbol-sun-gold.webp",
+    "system": {
+      "description": {
+        "value": "<p>Демонстрация нового триггера <strong>onRest</strong>: сообщение в чат после любого отдыха носителя. Эффект амулета (+1 КД) переносится на носителя при экипировке.</p>"
+      },
+      "type": { "value": "trinket" },
+      "equipped": true
+    },
+    "_forge": {
+      "sourceId": "okassen.demo.amulet",
+      "onRest": "chatCard",
+      "effects": [
+        {
+          "id": "okassen-demo-amulet-ac",
+          "label": "Бодрость",
+          "icon": "icons/magic/light/explosion-star-glow-yellow.webp",
+          "transfer": true,
+          "changes": [
+            { "mechanic": "ac.bonus", "value": 1 }
+          ]
+        }
+      ],
+      "extraFlags": {
+        "okassen": {
+          "chatCard": "<p>«{item}» наливается теплом: {actor} отдохнул.</p>"
+        }
+      }
+    }
+  },
+
+  {
+    "name": "Свисток волка",
+    "type": "consumable",
+    "img": "icons/tools/instruments/whistle-bone-brown.webp",
+    "system": {
+      "description": {
+        "value": "<p>Демонстрация обработчика <strong>summon</strong>. Чтобы он сработал, замените <code>Actor.ЗАМЕНИТЕ-НА-UUID-АКТЁРА</code> во флаге <code>okassen.summon.actor</code> на UUID любого актёра мира (ПКМ по актёру → «Копировать UUID»). Носителю нужен токен на сцене.</p>"
+      },
+      "type": { "value": "trinket" },
+      "quantity": 1,
+      "activities": {
+        "okassendemowhstl": {
+          "_id": "okassendemowhstl",
+          "type": "utility",
+          "name": "Свистнуть",
+          "activation": { "type": "action" }
+        }
+      }
+    },
+    "_forge": {
+      "sourceId": "okassen.demo.whistle",
+      "onUse": "summon",
+      "extraFlags": {
+        "okassen": {
+          "summon": {
+            "actor": "Actor.ЗАМЕНИТЕ-НА-UUID-АКТЁРА",
+            "count": 2,
+            "name": "Волк ({actor})",
+            "distance": 1
+          }
+        }
+      }
+    }
+  }
+]
