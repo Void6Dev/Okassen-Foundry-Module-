@@ -368,5 +368,7 @@
     "OKASSEN.sources.gone": "Документ больше не существует — список обновлён.",
     "OKASSEN.preview.willCreate": "Совпадений в мире нет — документ будет создан.",
     "OKASSEN.preview.willMatch": "Совпадает с документом «{name}» — импорт применит политику дублей (по умолчанию «обновить на месте»).",
-    "OKASSEN.import.targetSet": "Цель импорта: {uuid}"
+    "OKASSEN.import.targetSet": "Цель импорта: {uuid}",
+    "OKASSEN.notify.initFailed": "Окассен: шаг инициализации «{step}» не выполнен — подробности в консоли (F12). Остальные части модуля работают.",
+    "OKASSEN.tabs.renderFailed": "Вкладка не отрисовалась: {message}. Подробности — в консоли (F12)."
 }

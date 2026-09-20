@@ -19,7 +19,7 @@ import { initTransform } from "./transform.js";
 import { analyzeDependencies, midiActive } from "./deps.js";
 import { analyzeSchema } from "./schema.js";
 import { preprocess } from "./preprocess.js";
-import { registerHistorySetting, beginRecord, commitRecord, rollbackImport, buildHistoryHtml } from "./history.js";
+import { registerHistorySetting, beginRecord, commitRecord, rollbackImport, buildHistoryHtml, historyCount } from "./history.js";
 import { buildPreviewHtml } from "./preview.js";
 import { escapeHtml, itemTypes, actorTypes } from "./util.js";
 import { registerSettings, getSetting } from "./settings.js";
@@ -31,6 +31,26 @@ import { buildSourcesHtml, openSourceDiff, rebuildDocument, rebuildAll, sourceOf
 const MODULE_ID = "okassen";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/**
+ * Запустить шаг инициализации в изоляции.
+ *
+ * Раньше init и ready были одной цепочкой вызовов: исключение в любом из них
+ * (например, в регистрации обработчиков) молча отменяло ВСЁ, что шло дальше —
+ * включая настройку истории импорта, без которой ломались вкладки окна.
+ * Теперь сбой одного шага виден в консоли, а остальные всё равно отрабатывают.
+ *
+ * @param {string} step — имя шага для сообщения об ошибке
+ * @param {Function} fn — сам шаг
+ */
+function safeInit(step, fn) {
+  try {
+    fn();
+  } catch (err) {
+    console.error(`[okassen] Шаг инициализации "${step}" не удался:`, err);
+    ui.notifications?.error(game.i18n.format("OKASSEN.notify.initFailed", { step }));
+  }
+}
 
 /**
  * Локализованное описание механики (см. lang/*.json, ключи OKASSEN.mech.*
@@ -325,9 +345,31 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Таймер отложенной проверки _forge (см. #renderLint). */
   #lintTimer = null;
 
-  /** После рендера — оживляем редактор и наполняем статичные вкладки. */
+  /**
+   * После рендера — оживляем редактор и наполняем статичные вкладки.
+   *
+   * Каждая группа слушателей вешается отдельно: исключение в одной (скажем,
+   * в редакторе) не должно оставить окно без вкладок и кнопок.
+   */
   _onRender(context, options) {
     super._onRender(context, options);
+    for (const [step, fn] of Object.entries({
+      editor: () => this.#initEditor(),
+      files: () => this.#initFileInput(),
+      dragDrop: () => this.#initDragAndDrop(),
+      lint: () => this.#initLintListeners(),
+      lists: () => this.#initListListeners()
+    })) {
+      try {
+        fn();
+      } catch (err) {
+        console.error(`[okassen] Не удалось подготовить "${step}" в окне импорта:`, err);
+      }
+    }
+  }
+
+  /** Подсветка, номера строк и автодополнение в текстовом поле JSON. */
+  #initEditor() {
     initJsonEditor(
       this.element.querySelector(".okassen-editor"),
       this.element.querySelector(".okassen-status-text"),
@@ -337,17 +379,19 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         hintEl: this.element.querySelector(".okassen-hint-line")
       }
     );
+  }
 
-    // Файл(ы) с диска: скрытый input, кнопка «Файл…» его открывает.
+  /** Скрытый input файлов: кнопка «Файл…» открывает его. */
+  #initFileInput() {
     this.element.querySelector(".okassen-file")?.addEventListener("change", async ev => {
       await this.#loadFiles([...ev.target.files]);
       ev.target.value = ""; // тот же файл можно выбрать повторно
     });
+  }
 
-    // Перетаскивание: JSON-файл с диска или документ из сайдбара.
-    this.#initDragAndDrop();
-
-    // Живая проверка _forge: с задержкой, чтобы не считать на каждую букву.
+  /** Живая проверка _forge и переход к строке по клику. */
+  #initLintListeners() {
+    // С задержкой, чтобы не считать на каждую букву.
     const textarea = this.element.querySelector(".okassen-json");
     textarea?.addEventListener("input", () => {
       clearTimeout(this.#lintTimer);
@@ -357,7 +401,10 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       const el = ev.target.closest("[data-line]");
       if (el) this.#jumpToLine(Number(el.dataset.line));
     });
+  }
 
+  /** Делегаты кликов на динамических списках: исходники, история, гайд. */
+  #initListListeners() {
     // Кнопки строк «Исходников» создаются динамически — ловим делегатом.
     this.element.querySelector(".okassen-sources-content")?.addEventListener("click", async ev => {
       const diffBtn = ev.target.closest("[data-source-diff]");
@@ -432,11 +479,32 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     for (const sec of this.element.querySelectorAll(".okassen-tab")) {
       sec.classList.toggle("active", sec.dataset.tab === tab);
     }
-    if (tab === "preview") this.#renderPreview();
-    else if (tab === "history") this.#renderHistory();
-    else if (tab === "handlers") this.#renderHandlers();
-    else if (tab === "sources") this.#renderSources();
-    else if (tab === "settings") this.#renderSettings();
+    // Наполнение динамических вкладок — в изоляции: ошибка в одной
+    // (например, из-за незарегистрированной настройки) не должна мешать
+    // переключаться на остальные. Текст ошибки показываем в самой вкладке,
+    // а не только в консоли: иначе вкладка выглядит «пустой и сломанной».
+    const renderers = {
+      preview: [() => this.#renderPreview(), ".okassen-preview-content"],
+      history: [() => this.#renderHistory(), ".okassen-history-content"],
+      handlers: [() => this.#renderHandlers(), ".okassen-handlers-content"],
+      sources: [() => this.#renderSources(), ".okassen-sources-content"],
+      settings: [() => this.#renderSettings(), ".okassen-settings-content"]
+    };
+    const entry = renderers[tab];
+    if (!entry) return;
+
+    const [render, selector] = entry;
+    try {
+      render();
+    } catch (err) {
+      console.error(`[okassen] Вкладка "${tab}" не отрисовалась:`, err);
+      const box = this.element.querySelector(selector);
+      if (box) {
+        box.innerHTML = `<p class="okassen-preview-error">✖ ${escapeHtml(
+          game.i18n.format("OKASSEN.tabs.renderFailed", { message: err.message })
+        )}</p>`;
+      }
+    }
   }
 
   /**
@@ -661,7 +729,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     const no = `<span class="okassen-dep-off">${L("OKASSEN.settings.inactive")}</span>`;
     const mod = game.modules.get(MODULE_ID);
     const dae = game.modules.get("dae")?.active;
-    const historyCount = game.settings.get(MODULE_ID, "importHistory")?.length ?? 0;
+    const records = historyCount();
 
     const row = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
     const onOff = v => v ? L("OKASSEN.settings.on") : L("OKASSEN.settings.off");
@@ -675,7 +743,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         ${row(L("OKASSEN.settings.core"), escapeHtml(game.version ?? game.data?.version ?? "?"))}
         ${row("midi-qol", midiActive() ? yes : no)}
         ${row("DAE", dae ? yes : no)}
-        ${row(L("OKASSEN.settings.historyCount"), String(historyCount))}
+        ${row(L("OKASSEN.settings.historyCount"), String(records))}
       </table>
 
       <h4 class="okassen-settings-head">${L("OKASSEN.settings.current")}</h4>
@@ -1106,19 +1174,21 @@ async function openExportDialog(doc) {
 Hooks.once("init", () => {
   // Настройки регистрируем ПЕРВЫМИ: их читают остальные подсистемы
   // (политика дублей, глубина вложений, лимит истории).
-  registerSettings();
+  safeInit("settings", registerSettings);
+
+  // История импорта — сразу за настройками: без этой регистрации
+  // game.settings.get("importHistory") бросает исключение, и окно импорта
+  // теряет вкладку «История» вместе с откатом.
+  safeInit("history", registerHistorySetting);
 
   // Регистрируем хуки использования предметов и подкладывания вложенных,
   // встроенный обработчик overTime (урон/лечение по ходам).
-  initOnUse();
-  initBuiltinHandlers();
-  initTransform();
-  initNestedHooks();
-  initOverTime();
-  initLifecycleHooks();
-
-  // История импорта (мировая настройка для отката).
-  registerHistorySetting();
+  safeInit("onUse", initOnUse);
+  safeInit("handlers", initBuiltinHandlers);
+  safeInit("transform", initTransform);
+  safeInit("nested", initNestedHooks);
+  safeInit("overTime", initOverTime);
+  safeInit("lifecycle", initLifecycleHooks);
 
   // Служебная настройка: журнал-руководство создаётся только один раз за мир,
   // чтобы не возвращать его тому, кто удалил журнал намеренно.
@@ -1134,7 +1204,7 @@ Hooks.once("ready", () => {
   // Канал «сделай за игрока»: действия, требующие прав ведущего
   // (эффект на чужого актёра, токен на сцене). Подписка — на ready,
   // когда game.socket и список пользователей уже готовы.
-  initRelay();
+  safeInit("relay", initRelay);
 
   // Публичное API: автор кампании регистрирует свои onUse-обработчики
   // и может импортировать предметы из макросов/консоли.

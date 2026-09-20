@@ -368,5 +368,7 @@
     "OKASSEN.sources.gone": "The document no longer exists — the list has been refreshed.",
     "OKASSEN.preview.willCreate": "No match in the world — the document will be created.",
     "OKASSEN.preview.willMatch": "Matches the document \"{name}\" — the import will apply the duplicate policy (\"update in place\" by default).",
-    "OKASSEN.import.targetSet": "Import target: {uuid}"
+    "OKASSEN.import.targetSet": "Import target: {uuid}",
+    "OKASSEN.notify.initFailed": "Okassen: initialization step \"{step}\" failed — see the console (F12) for details. The rest of the module still works.",
+    "OKASSEN.tabs.renderFailed": "The tab failed to render: {message}. See the console (F12) for details."
 }
