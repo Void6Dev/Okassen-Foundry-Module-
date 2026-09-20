@@ -1,0 +1,9 @@
+{
+  "name": "okassen-bji",
+  "private": true,
+  "type": "module",
+  "description": "Тесты модуля Okassen: Better JSON Integration. Сам модуль Foundry грузит по module.json — этот файл нужен только для node --test.",
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\""
+  }
+}

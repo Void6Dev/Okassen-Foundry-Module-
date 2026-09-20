@@ -25,6 +25,28 @@ const SETTING = "importHistory";
 /** Текущая (открытая) запись импорта; null вне импорта. */
 let current = null;
 
+/**
+ * Прочитать журнал импортов. Если настройка не зарегистрирована (сорвался
+ * шаг инициализации, модуль только что включили), возвращаем пустой список:
+ * вкладка «История» должна показать «пусто», а не уронить окно.
+ *
+ * @returns {Array<object>}
+ */
+function readHistory() {
+  try {
+    const value = game.settings.get(MODULE_ID, SETTING);
+    return Array.isArray(value) ? value : [];
+  } catch (err) {
+    console.warn("[okassen] История импорта недоступна:", err);
+    return [];
+  }
+}
+
+/** Сколько записей в журнале импортов (0, если журнал недоступен). */
+export function historyCount() {
+  return readHistory().length;
+}
+
 /** Регистрация настройки. Вызывается из main.js на init. */
 export function registerHistorySetting() {
   game.settings.register(MODULE_ID, SETTING, {
@@ -91,7 +113,7 @@ export async function commitRecord() {
   if (!rec || (!rec.created.length && !rec.replaced.length && !rec.updated.length)) return;
   try {
     const limit = Math.max(1, Number(getSetting("historyLimit")) || 30);
-    const history = [rec, ...game.settings.get(MODULE_ID, SETTING)].slice(0, limit);
+    const history = [rec, ...readHistory()].slice(0, limit);
     await game.settings.set(MODULE_ID, SETTING, history);
   } catch (err) {
     console.error("[okassen] Не удалось сохранить запись истории импорта:", err);
@@ -105,7 +127,7 @@ export async function commitRecord() {
  * @returns {Promise<{deleted: number, restored: number, reverted: number}>}
  */
 export async function rollbackImport(id) {
-  const history = game.settings.get(MODULE_ID, SETTING);
+  const history = readHistory();
   const rec = history.find(r => r.id === id);
   if (!rec) throw new Error(game.i18n.localize("OKASSEN.history.notFound"));
 
@@ -186,7 +208,7 @@ export async function rollbackImport(id) {
  * @returns {string}
  */
 export function buildHistoryHtml() {
-  const history = game.settings.get(MODULE_ID, SETTING);
+  const history = readHistory();
 
   const rows = history.map(rec => {
     const when = new Date(rec.ts).toLocaleString(game.i18n.lang);

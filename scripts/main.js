@@ -19,16 +19,38 @@ import { initTransform } from "./transform.js";
 import { analyzeDependencies, midiActive } from "./deps.js";
 import { analyzeSchema } from "./schema.js";
 import { preprocess } from "./preprocess.js";
-import { registerHistorySetting, beginRecord, commitRecord, rollbackImport, buildHistoryHtml } from "./history.js";
+import { registerHistorySetting, beginRecord, commitRecord, rollbackImport, buildHistoryHtml, historyCount } from "./history.js";
 import { buildPreviewHtml } from "./preview.js";
 import { escapeHtml, itemTypes, actorTypes } from "./util.js";
 import { registerSettings, getSetting } from "./settings.js";
 import { initBuiltinHandlers } from "./handlers.js";
 import { lintForge, findLine } from "./lint.js";
+import { initRelay } from "./relay.js";
+import { buildSourcesHtml, openSourceDiff, rebuildDocument, rebuildAll, sourceOf } from "./sources.js";
 
 const MODULE_ID = "okassen";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/**
+ * Запустить шаг инициализации в изоляции.
+ *
+ * Раньше init и ready были одной цепочкой вызовов: исключение в любом из них
+ * (например, в регистрации обработчиков) молча отменяло ВСЁ, что шло дальше —
+ * включая настройку истории импорта, без которой ломались вкладки окна.
+ * Теперь сбой одного шага виден в консоли, а остальные всё равно отрабатывают.
+ *
+ * @param {string} step — имя шага для сообщения об ошибке
+ * @param {Function} fn — сам шаг
+ */
+function safeInit(step, fn) {
+  try {
+    fn();
+  } catch (err) {
+    console.error(`[okassen] Шаг инициализации "${step}" не удался:`, err);
+    ui.notifications?.error(game.i18n.format("OKASSEN.notify.initFailed", { step }));
+  }
+}
 
 /**
  * Локализованное описание механики (см. lang/*.json, ключи OKASSEN.mech.*
@@ -263,7 +285,12 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     // Обработчики на data-action (клик по кнопке), НЕ submit формы —
     // так нет конфликтов с поведением <form>.
     actions: {
-      tab: OkassenImportDialog.#onTab,
+      // Имя действия — okassenTab, а НЕ tab: ApplicationV2 в Foundry v14
+      // обрабатывает "tab" сам (switch в #onClickAction вызывает _onClickTab
+      // раньше, чем смотрит в options.actions), поэтому обработчик модуля
+      // просто не вызывался — работала только вкладка, открытая по умолчанию.
+      // // verified against Foundry v14 build 365
+      okassenTab: OkassenImportDialog.#onTab,
       create: OkassenImportDialog.#onCreate,
       clear: OkassenImportDialog.#onClear,
       example: OkassenImportDialog.#onExample,
@@ -272,8 +299,13 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       export: OkassenImportDialog.#onExport,
       preview: OkassenImportDialog.#onPreview,
       fromUrl: OkassenImportDialog.#onFromUrl,
+      pickFile: OkassenImportDialog.#onPickFile,
+      download: OkassenImportDialog.#onDownload,
+      copy: OkassenImportDialog.#onCopy,
       historyRefresh: OkassenImportDialog.#onHistoryRefresh,
       handlersRefresh: OkassenImportDialog.#onHandlersRefresh,
+      sourcesRefresh: OkassenImportDialog.#onSourcesRefresh,
+      rebuildAll: OkassenImportDialog.#onRebuildAll,
       openConfig: OkassenImportDialog.#onOpenConfig
     }
   };
@@ -318,9 +350,31 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Таймер отложенной проверки _forge (см. #renderLint). */
   #lintTimer = null;
 
-  /** После рендера — оживляем редактор и наполняем статичные вкладки. */
+  /**
+   * После рендера — оживляем редактор и наполняем статичные вкладки.
+   *
+   * Каждая группа слушателей вешается отдельно: исключение в одной (скажем,
+   * в редакторе) не должно оставить окно без вкладок и кнопок.
+   */
   _onRender(context, options) {
     super._onRender(context, options);
+    for (const [step, fn] of Object.entries({
+      editor: () => this.#initEditor(),
+      files: () => this.#initFileInput(),
+      dragDrop: () => this.#initDragAndDrop(),
+      lint: () => this.#initLintListeners(),
+      lists: () => this.#initListListeners()
+    })) {
+      try {
+        fn();
+      } catch (err) {
+        console.error(`[okassen] Не удалось подготовить "${step}" в окне импорта:`, err);
+      }
+    }
+  }
+
+  /** Подсветка, номера строк и автодополнение в текстовом поле JSON. */
+  #initEditor() {
     initJsonEditor(
       this.element.querySelector(".okassen-editor"),
       this.element.querySelector(".okassen-status-text"),
@@ -330,8 +384,19 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         hintEl: this.element.querySelector(".okassen-hint-line")
       }
     );
+  }
 
-    // Живая проверка _forge: с задержкой, чтобы не считать на каждую букву.
+  /** Скрытый input файлов: кнопка «Файл…» открывает его. */
+  #initFileInput() {
+    this.element.querySelector(".okassen-file")?.addEventListener("change", async ev => {
+      await this.#loadFiles([...ev.target.files]);
+      ev.target.value = ""; // тот же файл можно выбрать повторно
+    });
+  }
+
+  /** Живая проверка _forge и переход к строке по клику. */
+  #initLintListeners() {
+    // С задержкой, чтобы не считать на каждую букву.
     const textarea = this.element.querySelector(".okassen-json");
     textarea?.addEventListener("input", () => {
       clearTimeout(this.#lintTimer);
@@ -340,6 +405,36 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     this.element.querySelector(".okassen-lint")?.addEventListener("click", ev => {
       const el = ev.target.closest("[data-line]");
       if (el) this.#jumpToLine(Number(el.dataset.line));
+    });
+  }
+
+  /** Делегаты кликов на динамических списках: исходники, история, гайд. */
+  #initListListeners() {
+    // Кнопки строк «Исходников» создаются динамически — ловим делегатом.
+    this.element.querySelector(".okassen-sources-content")?.addEventListener("click", async ev => {
+      const diffBtn = ev.target.closest("[data-source-diff]");
+      const rebuildBtn = ev.target.closest("[data-source-rebuild]");
+      const uuid = diffBtn?.dataset.sourceDiff ?? rebuildBtn?.dataset.sourceRebuild;
+      if (!uuid) return;
+
+      const doc = await fromUuid(uuid).catch(() => null);
+      if (!doc) {
+        ui.notifications.warn(game.i18n.localize("OKASSEN.sources.gone"));
+        this.#renderSources();
+        return;
+      }
+      if (diffBtn) return openSourceDiff(doc);
+
+      rebuildBtn.disabled = true;
+      beginRecord(game.i18n.format("OKASSEN.sources.rebuildOne", { name: doc.name }));
+      try {
+        await rebuildDocument(doc);
+      } catch (err) {
+        ui.notifications.error(err.message);
+      } finally {
+        await commitRecord();
+        this.#renderSources();
+      }
     });
 
     // Руководство — статично, наполняем один раз при рендере.
@@ -389,10 +484,141 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     for (const sec of this.element.querySelectorAll(".okassen-tab")) {
       sec.classList.toggle("active", sec.dataset.tab === tab);
     }
-    if (tab === "preview") this.#renderPreview();
-    else if (tab === "history") this.#renderHistory();
-    else if (tab === "handlers") this.#renderHandlers();
-    else if (tab === "settings") this.#renderSettings();
+    // Наполнение динамических вкладок — в изоляции: ошибка в одной
+    // (например, из-за незарегистрированной настройки) не должна мешать
+    // переключаться на остальные. Текст ошибки показываем в самой вкладке,
+    // а не только в консоли: иначе вкладка выглядит «пустой и сломанной».
+    const renderers = {
+      preview: [() => this.#renderPreview(), ".okassen-preview-content"],
+      history: [() => this.#renderHistory(), ".okassen-history-content"],
+      handlers: [() => this.#renderHandlers(), ".okassen-handlers-content"],
+      sources: [() => this.#renderSources(), ".okassen-sources-content"],
+      settings: [() => this.#renderSettings(), ".okassen-settings-content"]
+    };
+    const entry = renderers[tab];
+    if (!entry) return;
+
+    const [render, selector] = entry;
+    try {
+      render();
+    } catch (err) {
+      console.error(`[okassen] Вкладка "${tab}" не отрисовалась:`, err);
+      const box = this.element.querySelector(selector);
+      if (box) {
+        box.innerHTML = `<p class="okassen-preview-error">✖ ${escapeHtml(
+          game.i18n.format("OKASSEN.tabs.renderFailed", { message: err.message })
+        )}</p>`;
+      }
+    }
+  }
+
+  /**
+   * Перетаскивание в окно: JSON-файл с диска или документ из сайдбара
+   * (предмет, актёр, папка). Документ сразу экспортируется в редактор —
+   * копировать UUID руками больше не нужно.
+   *
+   * Слушатели вешаются на корень окна с preventDefault: иначе textarea
+   * обработает drop сам (вставит путь к файлу), а браузер откроет файл
+   * вместо импорта.
+   */
+  #initDragAndDrop() {
+    const root = this.element;
+    // Текст подсказки поверх окна рисует CSS (::after), но локализацию он не
+    // умеет — отдаём строку переменной. JSON.stringify даёт корректный
+    // CSS-литерал строки вместе с кавычками.
+    root.style.setProperty("--ok-drop-hint", JSON.stringify(game.i18n.localize("OKASSEN.file.dropHint")));
+
+    const over = ev => {
+      if (!ev.dataTransfer) return;
+      ev.preventDefault();
+      root.classList.add("okassen-dropping");
+    };
+    root.addEventListener("dragenter", over);
+    root.addEventListener("dragover", over);
+    root.addEventListener("dragleave", ev => {
+      // Уход за пределы окна, а не переход между его элементами.
+      if (!root.contains(ev.relatedTarget)) root.classList.remove("okassen-dropping");
+    });
+    root.addEventListener("drop", async ev => {
+      ev.preventDefault();
+      root.classList.remove("okassen-dropping");
+      await this.#handleDrop(ev);
+    });
+  }
+
+  /** Разобрать, что именно бросили в окно, и положить это в редактор. */
+  async #handleDrop(event) {
+    const files = [...(event.dataTransfer?.files ?? [])];
+    if (files.length) return this.#loadFiles(files);
+
+    // Документ из сайдбара: Foundry кладёт в text/plain JSON со ссылкой.
+    const raw = event.dataTransfer?.getData("text/plain");
+    if (!raw) return;
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return; // обычный текст — пусть его обработает textarea
+    }
+    const uuid = data?.uuid ?? (data?.type && data?.id ? `${data.type}.${data.id}` : null);
+    if (!uuid) return;
+
+    // Бросок на поле «UUID актёра-цели» заполняет именно его: перетащить
+    // актёра в цель — самое очевидное действие, и экспорт тут был бы сюрпризом.
+    const targetInput = event.target?.closest?.(".okassen-target");
+    if (targetInput) {
+      targetInput.value = uuid;
+      this.#showMessage(game.i18n.format("OKASSEN.import.targetSet", { uuid }), "success");
+      return;
+    }
+
+    let doc = await fromUuid(uuid).catch(() => null);
+    if (doc instanceof TokenDocument) doc = doc.actor;
+    try {
+      if (doc instanceof Folder) {
+        const arr = await buildFolderForgeJson(doc);
+        this.#exportDone(arr, game.i18n.format("OKASSEN.export.bulkDone", { count: arr.length, name: doc.name }));
+      } else if (doc instanceof Item || doc instanceof Actor) {
+        const json = await buildForgeJson(doc);
+        this.#exportDone(json, game.i18n.format("OKASSEN.export.done", { name: doc.name }));
+      }
+    } catch (err) {
+      this.#showMessage(err.message);
+    }
+  }
+
+  /**
+   * Прочитать JSON-файлы и положить их в редактор. Несколько файлов
+   * сливаются в один массив — это готовый пакетный импорт.
+   *
+   * @param {File[]} files
+   */
+  async #loadFiles(files) {
+    const json = files.filter(f => /\.json$/i.test(f.name) || (f.type ?? "").includes("json"));
+    if (!json.length) {
+      if (files.length) this.#showMessage(game.i18n.localize("OKASSEN.file.notJson"));
+      return;
+    }
+
+    const docs = [];
+    for (const file of json) {
+      let parsed;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch (err) {
+        this.#showMessage(game.i18n.format("OKASSEN.file.parseError", { file: file.name, message: err.message }));
+        return;
+      }
+      if (Array.isArray(parsed)) docs.push(...parsed);
+      else docs.push(parsed);
+    }
+
+    this.#setJson(JSON.stringify(docs.length === 1 ? docs[0] : docs, null, 2));
+    this.#showMessage(game.i18n.format("OKASSEN.file.loaded", {
+      files: json.length,
+      docs: docs.length
+    }), "success");
+    this.#activateTab("import");
   }
 
   /**
@@ -493,6 +719,12 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     if (box) box.innerHTML = buildHandlersHtml();
   }
 
+  /** Исходники: документы, содержимое которых разошлось с их JSON. */
+  #renderSources() {
+    const box = this.element.querySelector(".okassen-sources-content");
+    if (box) box.innerHTML = buildSourcesHtml();
+  }
+
   /** Настройки: версия модуля/формата, система и статус зависимостей. */
   #renderSettings() {
     const box = this.element.querySelector(".okassen-settings-content");
@@ -502,7 +734,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     const no = `<span class="okassen-dep-off">${L("OKASSEN.settings.inactive")}</span>`;
     const mod = game.modules.get(MODULE_ID);
     const dae = game.modules.get("dae")?.active;
-    const historyCount = game.settings.get(MODULE_ID, "importHistory")?.length ?? 0;
+    const records = historyCount();
 
     const row = (label, value) => `<tr><th>${label}</th><td>${value}</td></tr>`;
     const onOff = v => v ? L("OKASSEN.settings.on") : L("OKASSEN.settings.off");
@@ -516,7 +748,7 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         ${row(L("OKASSEN.settings.core"), escapeHtml(game.version ?? game.data?.version ?? "?"))}
         ${row("midi-qol", midiActive() ? yes : no)}
         ${row("DAE", dae ? yes : no)}
-        ${row(L("OKASSEN.settings.historyCount"), String(historyCount))}
+        ${row(L("OKASSEN.settings.historyCount"), String(records))}
       </table>
 
       <h4 class="okassen-settings-head">${L("OKASSEN.settings.current")}</h4>
@@ -682,6 +914,45 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     }
   }
 
+  /** Кнопка «Файл…»: открыть системный выбор файлов (input скрыт в шаблоне). */
+  static #onPickFile(_event, _target) {
+    this.element.querySelector(".okassen-file")?.click();
+  }
+
+  /** Кнопка «Скачать .json»: сохранить содержимое редактора файлом. */
+  static #onDownload(_event, _target) {
+    const raw = this.element.querySelector(".okassen-json").value;
+    if (!raw.trim()) {
+      this.#showMessage(game.i18n.localize("OKASSEN.file.nothingToSave"));
+      return;
+    }
+    // Имя файла — по имени документа, если он разбирается; иначе общее.
+    let name = "okassen-export";
+    try {
+      const parsed = JSON.parse(raw);
+      const first = Array.isArray(parsed) ? parsed.find(d => d?.name) : parsed;
+      if (first?.name) name = String(first.name).replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 60);
+    } catch { /* не разобрали — сохраняем как есть, имя общее */ }
+
+    const save = foundry.utils.saveDataToFile ?? globalThis.saveDataToFile;
+    save(raw, "application/json", `${name}.json`);
+  }
+
+  /** Кнопка «Копировать»: содержимое редактора в буфер обмена. */
+  static async #onCopy(_event, _target) {
+    const raw = this.element.querySelector(".okassen-json").value;
+    if (!raw.trim()) {
+      this.#showMessage(game.i18n.localize("OKASSEN.file.nothingToSave"));
+      return;
+    }
+    try {
+      await game.clipboard.copyPlainText(raw);
+      this.#showMessage(game.i18n.localize("OKASSEN.file.copied"), "success");
+    } catch (err) {
+      this.#showMessage(game.i18n.format("OKASSEN.file.copyFailed", { message: err.message }));
+    }
+  }
+
   /** Кнопка «Обновить» на вкладке «История»: перечитать журнал импортов. */
   static #onHistoryRefresh(_event, _target) {
     this.#renderHistory();
@@ -703,6 +974,38 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Кнопка «Обновить» на вкладке «Обработчики»: пересобрать список. */
   static #onHandlersRefresh(_event, _target) {
     this.#renderHandlers();
+  }
+
+  /** Кнопка «Обновить» на вкладке «Исходники»: пересчитать расхождения. */
+  static #onSourcesRefresh(_event, _target) {
+    this.#renderSources();
+  }
+
+  /**
+   * Кнопка «Пересобрать всё»: каждый документ модуля переимпортируется из
+   * своего исходника в режиме «Обновить на месте». Правки, сделанные руками
+   * в листах, будут потеряны — поэтому спрашиваем подтверждение, а вся
+   * пересборка пишется одной записью истории и откатывается одной кнопкой.
+   */
+  static async #onRebuildAll(_event, target) {
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: game.i18n.localize("OKASSEN.sources.rebuildAll") },
+      content: `<p>${game.i18n.localize("OKASSEN.sources.rebuildConfirm")}</p>`
+    });
+    if (!ok) return;
+
+    target.disabled = true;
+    try {
+      const { ok: done, failed } = await rebuildAll();
+      this.#showMessage(
+        game.i18n.format("OKASSEN.sources.rebuildDone", { count: done })
+          + (failed.length ? "\n" + failed.join("\n") : ""),
+        failed.length ? "error" : "success"
+      );
+    } finally {
+      target.disabled = false;
+      this.#renderSources();
+    }
   }
 
   /**
@@ -846,11 +1149,24 @@ class OkassenImportDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 }
 
+/**
+ * Открыть окно импорта с заранее выбранной папкой-назначением
+ * (пункт «Импорт Окассен сюда» в контекстном меню папки сайдбара).
+ */
+async function openImportInFolder(folder) {
+  const dlg = new OkassenImportDialog();
+  await dlg.render({ force: true });
+  const select = dlg.element.querySelector(".okassen-folder");
+  if (select && [...select.options].some(o => o.value === folder.id)) select.value = folder.id;
+  return dlg;
+}
+
 /** Открыть окно импорта с уже заполненным экспортом документа. */
 async function openExportDialog(doc) {
   const dlg = new OkassenImportDialog();
   await dlg.render({ force: true });
-  const json = await buildForgeJson(doc);
+  // Папка — массовый экспорт содержимого, документ — один JSON.
+  const json = doc instanceof Folder ? await buildFolderForgeJson(doc) : await buildForgeJson(doc);
   const textarea = dlg.element.querySelector(".okassen-json");
   textarea.value = JSON.stringify(json, null, 2);
   textarea.dispatchEvent(new Event("input"));
@@ -863,19 +1179,21 @@ async function openExportDialog(doc) {
 Hooks.once("init", () => {
   // Настройки регистрируем ПЕРВЫМИ: их читают остальные подсистемы
   // (политика дублей, глубина вложений, лимит истории).
-  registerSettings();
+  safeInit("settings", registerSettings);
+
+  // История импорта — сразу за настройками: без этой регистрации
+  // game.settings.get("importHistory") бросает исключение, и окно импорта
+  // теряет вкладку «История» вместе с откатом.
+  safeInit("history", registerHistorySetting);
 
   // Регистрируем хуки использования предметов и подкладывания вложенных,
   // встроенный обработчик overTime (урон/лечение по ходам).
-  initOnUse();
-  initBuiltinHandlers();
-  initTransform();
-  initNestedHooks();
-  initOverTime();
-  initLifecycleHooks();
-
-  // История импорта (мировая настройка для отката).
-  registerHistorySetting();
+  safeInit("onUse", initOnUse);
+  safeInit("handlers", initBuiltinHandlers);
+  safeInit("transform", initTransform);
+  safeInit("nested", initNestedHooks);
+  safeInit("overTime", initOverTime);
+  safeInit("lifecycle", initLifecycleHooks);
 
   // Служебная настройка: журнал-руководство создаётся только один раз за мир,
   // чтобы не возвращать его тому, кто удалил журнал намеренно.
@@ -888,6 +1206,11 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", () => {
+  // Канал «сделай за игрока»: действия, требующие прав ведущего
+  // (эффект на чужого актёра, токен на сцене). Подписка — на ready,
+  // когда game.socket и список пользователей уже готовы.
+  safeInit("relay", initRelay);
+
   // Публичное API: автор кампании регистрирует свои onUse-обработчики
   // и может импортировать предметы из макросов/консоли.
   const mod = game.modules.get(MODULE_ID);
@@ -905,6 +1228,8 @@ Hooks.once("ready", () => {
       resolveMechanic,
       buildForgeJson,
       rollbackImport,
+      rebuildDocument,
+      rebuildAll,
       FORMAT_VERSION,
       openImportDialog: () => new OkassenImportDialog().render({ force: true }),
       openGuide
@@ -927,13 +1252,16 @@ Hooks.once("ready", () => {
 });
 
 /**
- * Кнопка «Импорт Окассен» в шапке сайдбара предметов.
+ * Кнопка «Импорт Окассен» в шапке сайдбара — и у предметов, и у актёров:
+ * НИПы импортируются тем же окном, а искать кнопку во вкладке предметов
+ * было неочевидно.
+ *
  * В v13 сайдбар — ApplicationV2, hook отдаёт HTMLElement; на всякий случай
  * поддерживаем и jQuery (если другой модуль обернул).
  */
-Hooks.on("renderItemDirectory", (_app, html) => {
+function addDirectoryButton(html) {
   const root = html instanceof HTMLElement ? html : html[0];
-  if (root.querySelector(".okassen-import-button")) return; // не дублируем при ре-рендере
+  if (!root || root.querySelector(".okassen-import-button")) return; // не дублируем
 
   const btn = document.createElement("button");
   btn.type = "button";
@@ -946,7 +1274,10 @@ Hooks.on("renderItemDirectory", (_app, html) => {
     ?? root.querySelector(".directory-header")
     ?? root;
   anchor.appendChild(btn);
-});
+}
+
+Hooks.on("renderItemDirectory", (_app, html) => addDirectoryButton(html));
+Hooks.on("renderActorDirectory", (_app, html) => addDirectoryButton(html));
 
 /**
  * Пункт «Экспорт Окассен (JSON)» в контекстном меню сайдбара.
@@ -970,6 +1301,17 @@ Hooks.on("getItemContextOptions", (_app, options) => {
       if (item) await openExportDialog(item);
     }
   });
+  options.push({
+    name: "OKASSEN.sources.menu",
+    icon: '<i class="fa-solid fa-code-compare"></i>',
+    // Пункт есть только у документов, созданных модулем: сравнивать больше
+    // не с чем.
+    condition: li => !!sourceOf(game.items.get(directoryEntryId(li))),
+    callback: async li => {
+      const item = game.items.get(directoryEntryId(li));
+      if (item) await openSourceDiff(item);
+    }
+  });
 });
 
 /** То же для актёров: «Экспорт Окассен (JSON)» в контекстном меню НИПа. */
@@ -982,4 +1324,57 @@ Hooks.on("getActorContextOptions", (_app, options) => {
       if (actor) await openExportDialog(actor);
     }
   });
+  options.push({
+    name: "OKASSEN.sources.menu",
+    icon: '<i class="fa-solid fa-code-compare"></i>',
+    condition: li => !!sourceOf(game.actors.get(directoryEntryId(li))),
+    callback: async li => {
+      const actor = game.actors.get(directoryEntryId(li));
+      if (actor) await openSourceDiff(actor);
+    }
+  });
 });
+
+/**
+ * Контекстное меню ПАПКИ: импорт прямо в неё и экспорт всего содержимого.
+ *
+ * Имя хука в Foundry различается по версиям (getFolderContextOptions в v13+,
+ * getItem/ActorDirectoryFolderContext в старых сборках), поэтому
+ * подписываемся на все и защищаемся от дублей по имени пункта.
+ */
+function addFolderContextOptions(options) {
+  const has = key => options.some(o => o.name === key);
+  const folderOf = li => {
+    const el = li instanceof HTMLElement ? li : li?.[0];
+    const id = el?.dataset.folderId ?? el?.dataset.entryId;
+    const folder = game.folders.get(id);
+    return ["Item", "Actor"].includes(folder?.type) ? folder : null;
+  };
+
+  if (!has("OKASSEN.folder.importHere")) {
+    options.push({
+      name: "OKASSEN.folder.importHere",
+      icon: '<i class="fa-solid fa-file-import"></i>',
+      condition: li => !!folderOf(li),
+      callback: async li => {
+        const folder = folderOf(li);
+        if (folder) await openImportInFolder(folder);
+      }
+    });
+  }
+  if (!has("OKASSEN.folder.exportAll")) {
+    options.push({
+      name: "OKASSEN.folder.exportAll",
+      icon: '<i class="fa-solid fa-file-export"></i>',
+      condition: li => !!folderOf(li),
+      callback: async li => {
+        const folder = folderOf(li);
+        if (folder) await openExportDialog(folder);
+      }
+    });
+  }
+}
+
+for (const hook of ["getFolderContextOptions", "getItemDirectoryFolderContext", "getActorDirectoryFolderContext"]) {
+  Hooks.on(hook, (_app, options) => addFolderContextOptions(options));
+}

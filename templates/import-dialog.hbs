@@ -1,29 +1,35 @@
 <div class="okassen-import-body okassen-tabbed">
 
     {{!-- ============================================================ --}}
-    {{!-- Навигация по вкладкам. Переключение — action "tab" (main.js),  --}}
+    {{!-- Навигация по вкладкам. Действие называется okassenTab, а не tab: --}}
+    {{!-- имя "tab" зарезервировано ядром Foundry v14 (ApplicationV2 ловит   --}}
+    {{!-- его своим switch до обработчиков приложения), и наш обработчик     --}}
+    {{!-- тогда не вызывается вовсе. // verified against Foundry v14 b365    --}}
     {{!-- все секции присутствуют в DOM, скрытые погашены классом.       --}}
     {{!-- ============================================================ --}}
     <nav class="okassen-tabs" aria-label="Okassen">
-        <button type="button" class="okassen-tab-btn active" data-action="tab" data-tab="import">
+        <button type="button" class="okassen-tab-btn active" data-action="okassenTab" data-tab="import">
             <i class="fa-solid fa-file-import"></i> {{localize "OKASSEN.tabs.import"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="export">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="export">
             <i class="fa-solid fa-file-export"></i> {{localize "OKASSEN.tabs.export"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="preview">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="preview">
             <i class="fa-solid fa-eye"></i> {{localize "OKASSEN.tabs.preview"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="history">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="history">
             <i class="fa-solid fa-clock-rotate-left"></i> {{localize "OKASSEN.tabs.history"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="handlers">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="handlers">
             <i class="fa-solid fa-code"></i> {{localize "OKASSEN.tabs.handlers"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="guide">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="sources">
+            <i class="fa-solid fa-code-compare"></i> {{localize "OKASSEN.tabs.sources"}}
+        </button>
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="guide">
             <i class="fa-solid fa-book-open"></i> {{localize "OKASSEN.tabs.guide"}}
         </button>
-        <button type="button" class="okassen-tab-btn" data-action="tab" data-tab="settings">
+        <button type="button" class="okassen-tab-btn" data-action="okassenTab" data-tab="settings">
             <i class="fa-solid fa-gear"></i> {{localize "OKASSEN.tabs.settings"}}
         </button>
     </nav>
@@ -75,13 +81,26 @@
                     <button type="button" data-action="example">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "OKASSEN.import.example"}}
                     </button>
+                    <button type="button" data-action="pickFile">
+                        <i class="fa-solid fa-folder-open"></i> {{localize "OKASSEN.file.button"}}
+                    </button>
                     <button type="button" data-action="fromUrl">
                         <i class="fa-solid fa-link"></i> {{localize "OKASSEN.url.button"}}
+                    </button>
+                    <button type="button" data-action="download">
+                        <i class="fa-solid fa-download"></i> {{localize "OKASSEN.file.download"}}
+                    </button>
+                    <button type="button" data-action="copy">
+                        <i class="fa-solid fa-copy"></i> {{localize "OKASSEN.file.copy"}}
                     </button>
                     <button type="button" data-action="clear">
                         <i class="fa-solid fa-eraser"></i> {{localize "OKASSEN.import.clear"}}
                     </button>
                 </footer>
+
+                {{!-- Скрытый выбор файлов: открывается кнопкой «Файл…».
+                      multiple — несколько JSON сливаются в пакетный массив. --}}
+                <input type="file" class="okassen-file" accept=".json,application/json" multiple hidden>
             </div>
 
             {{!-- Правая колонка: карточка «Назначение» --}}
@@ -184,6 +203,22 @@
             </button>
         </div>
         <div class="okassen-handlers-content okassen-tab-scroll"></div>
+    </section>
+
+    {{!-- ============================================================ --}}
+    {{!-- Вкладка «Исходники»: расхождения документов с их JSON.        --}}
+    {{!-- ============================================================ --}}
+    <section class="okassen-tab" data-tab="sources">
+        <p class="okassen-hint">{{localize "OKASSEN.sources.hint"}}</p>
+        <div class="okassen-tab-toolbar">
+            <button type="button" data-action="sourcesRefresh">
+                <i class="fa-solid fa-rotate"></i> {{localize "OKASSEN.history.refresh"}}
+            </button>
+            <button type="button" data-action="rebuildAll">
+                <i class="fa-solid fa-arrows-rotate"></i> {{localize "OKASSEN.sources.rebuildAll"}}
+            </button>
+        </div>
+        <div class="okassen-sources-content okassen-tab-scroll"></div>
     </section>
 
     {{!-- ============================================================ --}}

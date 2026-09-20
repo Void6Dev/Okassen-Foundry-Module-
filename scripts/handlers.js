@@ -19,9 +19,14 @@
  *
  * Обработчики вызываются и из onUse, и из любого хука жизненного цикла
  * (onEquip, onTurnStart…): контекст один и тот же.
+ *
+ * Действия, на которые у игрока нет прав (эффект на чужого актёра, токен на
+ * сцене), уходят активному ведущему через relay.js — он перечитывает конфиг
+ * из самого предмета и исполняет сам.
  */
 
 import { registerHandler } from "./onuse.js";
+import { requestGM, registerRelayAction } from "./relay.js";
 
 const MODULE_ID = "okassen";
 
@@ -107,8 +112,117 @@ function pickEffects(item, ref) {
   return all.filter(fx => refs.includes(fx.id) || refs.includes(fx.name));
 }
 
+/**
+ * Наложить эффекты предмета на список актёров (у вызывающего есть права).
+ *
+ * @param {Actor[]} recipients — кому накладываем
+ * @param {Item|null} item — предмет-источник
+ * @param {ActiveEffect[]} effects — какие эффекты предмета переносим
+ * @param {object} cfg — конфиг обработчика (duration, stack)
+ */
+async function applyEffectsTo(recipients, item, effects, cfg = {}) {
+  for (const recipient of recipients) {
+    const payload = effects.map(fx => {
+      const data = fx.toObject();
+      delete data._id;                  // на цели это НОВЫЙ эффект
+      data.origin = item?.uuid ?? null; // «откуда» — для отмены и подсказок
+      data.transfer = false;
+      data.disabled = false;
+      if (cfg.duration) data.duration = foundry.utils.mergeObject(data.duration ?? {}, cfg.duration);
+      foundry.utils.setProperty(data, `flags.${MODULE_ID}.appliedBy`, item?.uuid ?? null);
+      return data;
+    });
+
+    // Повторное использование не копит дубли: прежние эффекты от того же
+    // предмета сначала снимаем (если не сказано иное).
+    if (cfg.stack !== true) {
+      const stale = recipient.effects
+        .filter(fx => fx.getFlag(MODULE_ID, "appliedBy") === item?.uuid)
+        .map(fx => fx.id);
+      if (stale.length) await recipient.deleteEmbeddedDocuments("ActiveEffect", stale);
+    }
+    if (payload.length) await recipient.createEmbeddedDocuments("ActiveEffect", payload);
+  }
+}
+
+/**
+ * Поставить токены призванного актёра вокруг носителя. Выполняется только
+ * там, где есть права на создание токенов (у ведущего — напрямую или по
+ * запросу игрока через relay.js).
+ *
+ * @param {Item|null} item — предмет-источник (в его флагах конфиг)
+ * @param {Actor|null} actor — носитель (вокруг его токена ставим)
+ * @param {object} [ctx] — контекст для подстановок в имени
+ */
+async function performSummon(item, actor, ctx = {}) {
+  const cfg = readConfig(item ?? actor, "summon");
+  const summonActor = await resolveDocument(cfg.actor, game.actors);
+  if (!(summonActor instanceof Actor)) {
+    return misconfigured("summon", item ?? actor, "OKASSEN.handlers.summonNoActor", { actor: cfg.actor ?? "—" });
+  }
+
+  const origin = actor?.getActiveTokens?.(true)[0] ?? actor?.token?.object;
+  const scene = origin?.scene ?? canvas.scene;
+  if (!scene) return misconfigured("summon", item ?? actor, "OKASSEN.handlers.noScene");
+
+  const grid = scene.grid.size;
+  const count = Math.max(1, Math.min(Number(cfg.count) || 1, 12)); // 12 — потолок от опечаток
+  const base = await summonActor.getTokenDocument({
+    actorLink: false,
+    disposition: cfg.disposition ?? CONST.TOKEN_DISPOSITIONS.FRIENDLY
+  });
+
+  const docs = [];
+  for (let i = 0; i < count; i++) {
+    const data = base.toObject();
+    delete data._id;
+    if (cfg.name) data.name = fillPlaceholders(cfg.name, { item, actor, ...ctx });
+    // Раскладываем по кольцу вокруг носителя: по клетке на призванного.
+    const angle = (i / count) * Math.PI * 2;
+    data.x = Math.round((origin?.document?.x ?? scene.dimensions.sceneX) + Math.cos(angle) * grid * (cfg.distance ?? 1));
+    data.y = Math.round((origin?.document?.y ?? scene.dimensions.sceneY) + Math.sin(angle) * grid * (cfg.distance ?? 1));
+    foundry.utils.setProperty(data, `flags.${MODULE_ID}.summonedBy`, item?.uuid ?? actor?.uuid ?? null);
+    docs.push(data);
+  }
+  const created = await scene.createEmbeddedDocuments("Token", docs);
+  ui.notifications.info(game.i18n.format("OKASSEN.handlers.summoned", {
+    count: created.length, name: summonActor.name
+  }));
+}
+
+/**
+ * Действия, которые ведущий выполняет по просьбе игрока. Конфиг и эффекты
+ * ведущий берёт ИЗ ПРЕДМЕТА, а не из сообщения: клиент передаёт только
+ * ссылки (см. relay.js).
+ */
+function registerRelayActions() {
+  registerRelayAction("applyEffect", async (payload, user, item) => {
+    const cfg = readConfig(item, "applyEffect");
+    const effects = pickEffects(item, cfg.effect ?? cfg.effects);
+    if (!effects.length) return;
+
+    const targets = [];
+    for (const uuid of payload.targetUuids ?? []) {
+      const doc = await fromUuid(uuid).catch(() => null);
+      const target = doc instanceof Actor ? doc : doc?.actor;
+      if (target) targets.push(target);
+    }
+    if (!targets.length) return;
+
+    await applyEffectsTo(targets, item, effects, cfg);
+    console.log(`[okassen] Релей: эффекты предмета "${item.name}" наложены по просьбе ${user.name} (целей: ${targets.length})`);
+  });
+
+  registerRelayAction("summon", async (payload, user, item) => {
+    await performSummon(item, item.actor, {});
+    console.log(`[okassen] Релей: призыв от предмета "${item.name}" выполнен по просьбе ${user.name}`);
+  });
+}
+
 /** Регистрация всех встроенных обработчиков. Вызывается из main.js (init). */
 export function initBuiltinHandlers() {
+  registerRelayActions();
+
   /* ---------------------------------------------------------------- */
   /* chatCard — сообщение в чат                                        */
   /* ---------------------------------------------------------------- */
@@ -140,33 +254,22 @@ export function initBuiltinHandlers() {
     const recipients = resolveRecipients(cfg, actor);
     if (!recipients.length) return misconfigured("applyEffect", item ?? actor, "OKASSEN.handlers.noTargets");
 
-    for (const recipient of recipients) {
-      // Права: наложить эффект на чужого актёра игрок не может — Foundry
-      // молча откажет, поэтому говорим об этом прямо.
-      if (!recipient.isOwner) {
-        ui.notifications.warn(game.i18n.format("OKASSEN.handlers.noPermission", { name: recipient.name }));
-        continue;
-      }
-      const payload = effects.map(fx => {
-        const data = fx.toObject();
-        delete data._id;                 // на цели это НОВЫЙ эффект
-        data.origin = item?.uuid ?? null; // «откуда» — для отмены и подсказок
-        data.transfer = false;
-        data.disabled = false;
-        if (cfg.duration) data.duration = foundry.utils.mergeObject(data.duration ?? {}, cfg.duration);
-        foundry.utils.setProperty(data, `flags.${MODULE_ID}.appliedBy`, item?.uuid ?? null);
-        return data;
-      });
+    // Чужие актёры — через ведущего одним запросом; свои — прямо здесь.
+    const mine = recipients.filter(a => a.isOwner);
+    const foreign = recipients.filter(a => !a.isOwner);
 
-      // Повторное использование не копит дубли: одноимённые от того же
-      // предмета сначала снимаем (если не сказано иное).
-      if (cfg.stack !== true) {
-        const stale = recipient.effects
-          .filter(fx => fx.getFlag(MODULE_ID, "appliedBy") === item?.uuid)
-          .map(fx => fx.id);
-        if (stale.length) await recipient.deleteEmbeddedDocuments("ActiveEffect", stale);
+    await applyEffectsTo(mine, item, effects, cfg);
+
+    if (foreign.length) {
+      const sent = requestGM("applyEffect", {
+        itemUuid: item?.uuid ?? null,
+        targetUuids: foreign.map(a => a.uuid)
+      });
+      if (!sent) {
+        ui.notifications.warn(game.i18n.format("OKASSEN.handlers.noPermission", {
+          name: foreign.map(a => a.name).join(", ")
+        }));
       }
-      await recipient.createEmbeddedDocuments("ActiveEffect", payload);
     }
   });
 
@@ -207,42 +310,14 @@ export function initBuiltinHandlers() {
   /* ---------------------------------------------------------------- */
   registerHandler("summon", async ctx => {
     const { item, actor } = ctx;
-    const cfg = readConfig(item ?? actor, "summon");
-    const summonActor = await resolveDocument(cfg.actor, game.actors);
-    if (!(summonActor instanceof Actor)) {
-      return misconfigured("summon", item ?? actor, "OKASSEN.handlers.summonNoActor", { actor: cfg.actor ?? "—" });
+    // Токены на сцене создаёт ведущий: у игрока таких прав нет, и Foundry
+    // откажет молча. Просим ведущего — он перечитает конфиг сам.
+    if (!game.user.isGM) {
+      const sent = requestGM("summon", { itemUuid: item?.uuid ?? null });
+      if (!sent) ui.notifications.warn(game.i18n.localize("OKASSEN.handlers.summonNeedsGM"));
+      return;
     }
-    // Токены на сцене создаёт ведущий: у игрока нет таких прав, и Foundry
-    // откажет молча — предупреждаем честно.
-    if (!game.user.isGM) return ui.notifications.warn(game.i18n.localize("OKASSEN.handlers.summonNeedsGM"));
-
-    const origin = actor?.getActiveTokens?.(true)[0] ?? actor?.token?.object;
-    const scene = origin?.scene ?? canvas.scene;
-    if (!scene) return misconfigured("summon", item ?? actor, "OKASSEN.handlers.noScene");
-
-    const grid = scene.grid.size;
-    const count = Math.max(1, Math.min(Number(cfg.count) || 1, 12)); // 12 — потолок от опечаток
-    const base = await summonActor.getTokenDocument({
-      actorLink: false,
-      disposition: cfg.disposition ?? CONST.TOKEN_DISPOSITIONS.FRIENDLY
-    });
-
-    const docs = [];
-    for (let i = 0; i < count; i++) {
-      const data = base.toObject();
-      delete data._id;
-      if (cfg.name) data.name = fillPlaceholders(cfg.name, ctx);
-      // Раскладываем по кольцу вокруг носителя: по клетке на призванного.
-      const angle = (i / count) * Math.PI * 2;
-      data.x = Math.round((origin?.document?.x ?? scene.dimensions.sceneX) + Math.cos(angle) * grid * (cfg.distance ?? 1));
-      data.y = Math.round((origin?.document?.y ?? scene.dimensions.sceneY) + Math.sin(angle) * grid * (cfg.distance ?? 1));
-      foundry.utils.setProperty(data, `flags.${MODULE_ID}.summonedBy`, item?.uuid ?? actor?.uuid ?? null);
-      docs.push(data);
-    }
-    const created = await scene.createEmbeddedDocuments("Token", docs);
-    ui.notifications.info(game.i18n.format("OKASSEN.handlers.summoned", {
-      count: created.length, name: summonActor.name
-    }));
+    await performSummon(item, actor, ctx);
   });
 
   /* ---------------------------------------------------------------- */

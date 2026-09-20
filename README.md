@@ -24,14 +24,19 @@ Window tools:
 
 - **Preview** — dry run: shows the documents, resolved effect changes, nested items, handlers and all warnings without creating anything.
 - **History** — every import is logged; **Undo** deletes everything that import created and restores what it replaced.
+- **File… / drag & drop** — load one or several `.json` files (several files become one batch array), or drop a file straight into the window. Dropping an item, actor or folder from the sidebar exports it into the editor right away.
+- **Download / Copy** — save the editor content as a `.json` file or put it on the clipboard.
 - **From URL** — fetch JSON by a direct link (gist/GitHub raw); it is only placed into the editor.
 - **Handlers** — browser of registered onUse/hook handlers and the world documents referencing them.
+- **Sources** — the module stores the source JSON of everything it creates, so this tab lists documents whose content has drifted from that source (edits made by hand in the sheet, which the next import would overwrite). Each row offers a diff and a rebuild; **Rebuild everything** re-imports every module document from its source as a single, undoable history entry. The same diff is available from a document's context menu.
 - **Export** — item/actor UUID → extended JSON in the editor. Also accepts a **folder UUID** (`Folder.xxx`) or a **pack id** (`world.my-items`) for bulk export as a JSON array.
 - **Repeated import** — when the document already exists (matching `_forge.sourceId`, or name and type), the dialog shows a diff and offers **Update in place** (keeps uuid, folder, permissions and inventory position — only the content changes), **Replace** (delete and re-create) or **Create a copy**. The default answer is a module setting; batch import applies it silently. Note: an update is a rebuild, not a merge — `system` is replaced wholesale, so a field missing from the JSON returns to the system default.
 - **Live `_forge` check** — under the editor: unknown mechanics and handlers, `applyTo` pointing at a missing activity, unknown statuses, dependency and schema warnings. Click "line N" to jump there.
 - Import-time checks: unknown `system` fields (dnd5e schema) and mechanics/raw keys that need inactive **midi-qol**/**DAE** produce warnings.
 
-Module settings (Configure Settings → Module Settings): duplicate handling, import-history size, nesting depth, schema warnings, live check, guide journal creation.
+The **Okassen Import** button sits in the header of both the Items and the Actors sidebar; a folder's context menu offers "import into this folder" and "export the whole folder".
+
+Module settings (Configure Settings → Module Settings): duplicate handling, import-history size, nesting depth, schema warnings, live check, guide journal creation, and whether player actions may run as the GM.
 
 Programmatic access: `game.modules.get("okassen").api` — `createForgeItem(json, { target, folder, pack })`, `createForgeActor`, `importAny`, `preprocess`, `analyzeDependencies`, `analyzeSchema`, `registerHandler(id, fn)`, `MECHANICS`, `buildForgeJson`, `FORMAT_VERSION`, `openImportDialog()`.
 
@@ -135,7 +140,7 @@ Each reads its config from the flag of the same name (a bare string is shorthand
 }
 ```
 
-Applying an effect to an actor the player does not own is refused by Foundry — the handler says so instead of failing silently.
+Actions a player has no permission for — applying an effect to an actor they do not own, placing a token on the scene — are sent to the active GM over the module's socket channel ("Run player actions as the GM", on by default). The request carries only references (`itemUuid`, target uuids): the GM re-reads the config from the item itself, checks that the sender owns the carrier and that the item really declares that handler, and only then acts. Turn the setting off to keep such actions GM-only.
 
 **`transform` — turn the bearer into another actor with no sidebar clone and no macro.** Plain dnd5e polymorph creates a new `Name (Form)` actor whenever the token is linked; the handler unlinks the token first, so the new form is written into the token's `ActorDelta` (the only clone-free branch of `Actor5e#transformInto`, verified against dnd5e 5.3.3). The world actor and its sheet stay untouched; reverting just re-links the token, so a player can do it without GM token-creation rights.
 
@@ -214,10 +219,22 @@ https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/mod
   обработчики и все предупреждения — без создания чего-либо.
 - **История** — каждый импорт логируется; «Отменить» удаляет созданное этим
   импортом и восстанавливает заменённое.
+- **Файл… и перетаскивание** — загрузить один или несколько `.json` (несколько
+  файлов складываются в пакетный массив) или бросить файл прямо в окно.
+  Брошенный из сайдбара предмет, актёр или папка сразу экспортируются
+  в редактор — копировать UUID руками больше не нужно.
+- **Скачать / Копировать** — сохранить содержимое редактора файлом или
+  положить в буфер обмена.
 - **Из URL** — подтянуть JSON по прямой ссылке (raw-ссылка gist/GitHub);
   файл только подставляется в редактор.
 - **Обработчики** — браузер зарегистрированных onUse/хук-обработчиков и
   документов мира, которые на них ссылаются.
+- **Исходники** — модуль хранит исходный JSON всего, что создал, поэтому
+  вкладка показывает документы, содержимое которых разошлось с исходником
+  (правки руками в листе — их перезапишет следующий импорт). У каждой строки
+  есть diff и пересборка; **«Пересобрать всё»** переимпортирует все документы
+  модуля из их исходников одной откатываемой записью истории. Тот же diff
+  доступен из контекстного меню документа.
 - **Экспорт** — UUID предмета/актёра → расширенный JSON в редакторе. Поле
   принимает также **UUID папки** (`Folder.xxx`) и **id компендиума**
   (`world.my-items`) — массовый экспорт JSON-массивом.
@@ -236,9 +253,13 @@ https://github.com/Void6Dev/Okassen-Foundry-Module-/releases/latest/download/mod
   и механики/сырые ключи, требующие неактивных **midi-qol**/**DAE**, дают
   предупреждения.
 
+Кнопка **«Импорт Окассен»** есть в шапке и у предметов, и у актёров;
+в контекстном меню папки — «Импорт Окассен сюда» и «Экспорт Окассен: вся папка».
+
 Настройки модуля (**Настройка → Настройки модулей**): что делать с дубликатом,
 размер истории импорта, глубина вложений, предупреждения о схеме, живая
-проверка, создание журнала-руководства.
+проверка, создание журнала-руководства и разрешение выполнять действия игроков
+от имени ведущего.
 
 Программный доступ: `game.modules.get("okassen").api` —
 `createForgeItem(json, { target, folder, pack })`, `createForgeActor`, `importAny`,
@@ -359,8 +380,13 @@ OverTime. Пример: `{ "mechanic": "heal.overTime", "value": "5", "condition
 }
 ```
 
-Наложить эффект на чужого актёра Foundry игроку не даст — обработчик честно
-сообщает об этом, а не молчит.
+Действия, на которые у игрока нет прав (эффект на чужого актёра, токен на
+сцене), уходят активному ведущему по сокет-каналу модуля (настройка
+«Выполнять действия игроков от имени ведущего», включена по умолчанию).
+В запросе едут только ссылки (`itemUuid`, uuid целей): ведущий сам перечитывает
+конфиг из предмета, проверяет, что отправитель владеет носителем и что предмет
+действительно объявляет этот обработчик, и только потом действует. Выключите
+настройку, если такие действия должны оставаться только у ведущего.
 
 **`transform` — превращает носителя в другого актёра без клона в сайдбаре и без макроса.** Штатное превращение dnd5e для связанного токена создаёт актёра «Имя (Форма)» — клона; обработчик сначала отвязывает токен, поэтому новая форма пишется в `ActorDelta` самого токена (единственная ветка `Actor5e#transformInto` без клона, сверено с dnd5e 5.3.3). Мировой актёр и его лист не меняются, а возврат — это просто восстановление связи токена, поэтому он доступен игроку без прав на создание токенов.
 
@@ -397,3 +423,18 @@ game.modules.get("okassen").api.registerHandler("my-staff", ({ item, actor, trig
 ```
 
 Либо скрипт-макрос с именем `okassen:<id>` — без файлов и перезагрузок.
+
+## Разработка
+
+Тесты — обычный `node:test` с заглушками Foundry (`tests/foundry-stub.mjs`),
+зависимостей не требуют:
+
+```
+node --test "tests/*.test.mjs"
+```
+
+Покрыты словарь механик, сборка эффектов (включая стабильные `_id`),
+препроцессор `_defs`/`_vars`, линтер `_forge`, сравнение документов, а также
+целостность манифеста и локализации (все ключи, которые спрашивает код,
+должны быть переведены на оба языка). Те же тесты гоняет CI на каждый push
+и pull request.

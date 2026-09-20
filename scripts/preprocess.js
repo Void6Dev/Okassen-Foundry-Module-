@@ -226,7 +226,10 @@ function processDoc(doc, outerDefs, outerVars) {
   delete out._defs;
   delete out._vars;
 
-  if (Object.keys(defs).length) out = resolveRefs(out, defs, new Set());
+  // Раскрываем ссылки ВСЕГДА, даже когда сниппетов нет: иначе одинокий
+  // { "$ref": "опечатка" } молча доезжал бы до создания документа и давал
+  // пустой эффект вместо понятной ошибки «нет такого сниппета».
+  out = resolveRefs(out, defs, new Set());
   if (Object.keys(vars).length) out = applyVars(out, vars);
   return out;
 }
